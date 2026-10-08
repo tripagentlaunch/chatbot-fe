@@ -83,11 +83,18 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const lastSent = useRef("");
   const seeded = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Live sync: how many raw history messages we've already reflected locally,
+  // plus flags so the background poll doesn't fight an in-flight turn or the
+  // initial load. Lets a desk advisor's reply (written into history server-side)
+  // show up here without a refresh.
+  const serverLenRef = useRef(0);
+  const busyRef = useRef(false);
+  const readyRef = useRef(false);
 
   useEffect(() => {
     api
       .get<{ messages: HistoryMessage[] }>("/api/history")
-      .then((res) =>
+      .then((res) => {
         setMessages(
           res.messages
             .filter((m) => m.role === "user" || m.role === "assistant")
@@ -97,12 +104,50 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
               text: m.content,
               at: toMs(m.at),
             })),
-        ),
-      )
+        );
+        serverLenRef.current = res.messages.length;
+      })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) onAuthError?.();
       })
-      .finally(() => setHistoryReady(true));
+      .finally(() => {
+        readyRef.current = true;
+        setHistoryReady(true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Poll history for messages that appeared server-side without a local turn —
+  // i.e. a human desk advisor replying from the admin console. Skips while a
+  // turn is streaming (busyRef) or before the first load (readyRef).
+  useEffect(() => {
+    const iv = window.setInterval(() => {
+      if (busyRef.current || !readyRef.current) return;
+      api
+        .get<{ messages: HistoryMessage[] }>("/api/history")
+        .then((res) => {
+          if (res.messages.length <= serverLenRef.current) return;
+          const tail = res.messages
+            .slice(serverLenRef.current)
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m, i) => ({
+              id: m.id ?? `p-${Date.now()}-${i}`,
+              role: m.role as "user" | "assistant",
+              text: m.content,
+              at: toMs(m.at),
+            }));
+          serverLenRef.current = res.messages.length;
+          if (tail.length) {
+            setMessages((prev) => {
+              const seen = new Set(prev.map((x) => x.id));
+              const add = tail.filter((x) => !seen.has(x.id));
+              return add.length ? [...prev, ...add] : prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 8000);
+    return () => window.clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -113,6 +158,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   /** `resend`: the member's line is already in the thread, so repeat the turn, not the bubble. */
   async function send(text: string, resend = false) {
     setBusy(true);
+    busyRef.current = true;
     setPending("");
     setActivity(null);
     lastSent.current = text;
@@ -139,6 +185,9 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             ...replies.map((r, i) => ({ id: `a-${Date.now()}-${i}`, role: "assistant" as const, text: r, at: Date.now() })),
           ]);
           if (typeof event.chatId === "string") setChatId(event.chatId);
+          // This turn added a user + assistant row server-side; account for
+          // them so the poll doesn't re-append our own just-streamed reply.
+          serverLenRef.current += 2;
           setPending("");
           setActivity(null);
         } else if (event.type === "error") {
@@ -165,6 +214,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       }
     } finally {
       setBusy(false);
+      busyRef.current = false;
       setPending("");
       setActivity(null);
     }
