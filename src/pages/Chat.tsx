@@ -4,8 +4,13 @@ import MessageBubble from "../components/MessageBubble";
 import { api, ApiError, streamChat } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
-import { ArrowUpRight, ChevronLeft, Horizon, Phone } from "../design/icons";
+import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
+
+/** Human desk contact. Copied to clipboard + dialled from the header. */
+const HUMAN_AGENT_NUMBER = "8451871851";
+/** Same line in international form for the WhatsApp deep link (India +91). */
+const WHATSAPP_INTL = "918451871851";
 
 /*
  * chatbot-fe's chat page (chatbot-fe/dev), with the Tara design and a few extras on top.
@@ -72,6 +77,8 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [busy, setBusy] = useState(false);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState("");
+  const [capped, setCapped] = useState<string | null>(null);
+  const [agentNote, setAgentNote] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
   const lastSent = useRef("");
   const seeded = useRef(false);
@@ -139,8 +146,20 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
         }
       });
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) onAuthError?.();
-      fail();
+      if (err instanceof ApiError && err.status === 401) {
+        onAuthError?.();
+        fail();
+      } else if (err instanceof ApiError && err.status === 402) {
+        // Spend cap reached: close the chat. Show the server's message as a
+        // final reply (not a retryable failure) and lock the composer.
+        setCapped(err.message);
+        setMessages((prev) => [
+          ...prev.filter((m) => !m.failed),
+          { id: `cap-${Date.now()}`, role: "assistant", text: err.message, at: Date.now() },
+        ]);
+      } else {
+        fail();
+      }
     } finally {
       setBusy(false);
       setPending("");
@@ -161,6 +180,13 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyReady, seed]);
 
+  function talkToHuman() {
+    navigator.clipboard?.writeText(HUMAN_AGENT_NUMBER).catch(() => {});
+    setAgentNote(`${HUMAN_AGENT_NUMBER} copied — connecting you to a human agent…`);
+    window.setTimeout(() => setAgentNote(null), 3500);
+    window.location.href = `tel:${HUMAN_AGENT_NUMBER}`;
+  }
+
   const hasReply = messages.some((m) => m.role === "assistant" && !m.failed);
   const lastIsFailed = messages.length > 0 && messages[messages.length - 1].failed === true;
   const empty = historyReady && messages.length === 0 && !busy;
@@ -177,7 +203,16 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             <ChevronLeft />
           </button>
         ) : (
-          <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
+          <a
+            className="tc-iconbtn"
+            href={`https://wa.me/${WHATSAPP_INTL}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Chat on WhatsApp"
+            title="Chat on WhatsApp"
+          >
+            <WhatsApp />
+          </a>
         )}
         <div className="tc-header__title">
           <span className="tc-title">
@@ -193,9 +228,21 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             <Phone />
           </button>
         ) : (
-          <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
+          <button
+            type="button"
+            className="tc-iconbtn"
+            aria-label="Talk to a human agent"
+            title="Talk to a human agent"
+            onClick={talkToHuman}
+          >
+            <Phone />
+          </button>
         )}
       </header>
+
+      {agentNote && (
+        <p className="tc-toast" role="status">{agentNote}</p>
+      )}
 
       <div className="tc-scroll">
         {empty && (
@@ -256,7 +303,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           </div>
         )}
 
-        {!busy && (hasReply || empty) && (
+        {!busy && !capped && (hasReply || empty) && (
           <div className="tc-chips-wrap">
             <p className="tc-chips-label">Explore with Tara</p>
             <div className="tc-chips">
@@ -278,7 +325,11 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       </div>
 
       <div className="tc-dock">
-        <ChatInput disabled={busy} onSend={(t) => send(t)} value={draft} onChange={setDraft} />
+        {capped ? (
+          <p className="tc-capped" role="status">{capped}</p>
+        ) : (
+          <ChatInput disabled={busy} onSend={(t) => send(t)} value={draft} onChange={setDraft} />
+        )}
       </div>
     </div>
   );

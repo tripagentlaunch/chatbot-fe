@@ -59,6 +59,13 @@ export const ArrowUpRight = ({ size }: { size?: number }) => (
   </Svg>
 );
 
+export const WhatsApp = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M3.5 20.5l1.3-3.9a8 8 0 1 1 3 3z" />
+    <path d="M8.6 8.9c.14-.4.3-.44.54-.44h.44c.2 0 .4.03.6.47l.58 1.37c.08.18.03.33-.08.47l-.4.48c-.1.12-.13.27-.06.42.24.48.58.92 1.02 1.32.44.4.88.62 1.32.76.16.05.31 0 .43-.1l.48-.44c.14-.12.3-.15.46-.08l1.36.6c.2.08.3.24.3.4 0 .5-.25.93-.6 1.17-.3.2-.68.32-1.07.32-1.27 0-2.9-.86-4.18-2.13-1.27-1.27-2.13-2.9-2.13-4.17 0-.4.1-.68.26-.98z" />
+  </Svg>
+);
+
 /** Tara's mark: a sun on the horizon. */
 export const Horizon = ({ size = 18 }: { size?: number }) => (
   <Svg size={size} strokeWidth={1.6}>
