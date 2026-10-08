@@ -157,6 +157,9 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           ...prev.filter((m) => !m.failed),
           { id: `cap-${Date.now()}`, role: "assistant", text: err.message, at: Date.now() },
         ]);
+      } else if (err instanceof ApiError && err.status === 429) {
+        // Rate limit / daily cap: show the server's own message, still retryable.
+        fail(err.message);
       } else {
         fail();
       }
