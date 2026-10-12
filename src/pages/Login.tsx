@@ -14,15 +14,17 @@ export default function Login() {
   // same code, without typing it. The code is read from the #fragment (never
   // sent to a server or logged) and cleared from the address bar first.
   const handoffTried = useRef(false);
+  // Codes copied from the invite email can carry spaces between letters.
+  const clean = (v: string) => v.replace(/\s+/g, "").toUpperCase();
   useEffect(() => {
     if (handoffTried.current) return;
     handoffTried.current = true;
     const handoff = new URLSearchParams(window.location.hash.slice(1)).get("code");
     if (!handoff) return;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    setCode(handoff.toUpperCase());
+    setCode(clean(handoff));
     setBusy(true);
-    signIn(handoff.trim().toUpperCase())
+    signIn(clean(handoff))
       .then(() => navigate("/chat", { replace: true }))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Something went wrong."))
       .finally(() => setBusy(false));
@@ -33,7 +35,7 @@ export default function Login() {
     setError(null);
     setBusy(true);
     try {
-      await signIn(code.trim().toUpperCase());
+      await signIn(clean(code));
       navigate("/chat");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
@@ -52,7 +54,7 @@ export default function Login() {
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="AB1234CD"
-          maxLength={20}
+          maxLength={40}
         />
         {error && <p className="error">{error}</p>}
         <button type="submit" disabled={busy || !code.trim()}>
