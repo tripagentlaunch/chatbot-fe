@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, useAuth } from "../context/AuthContext";
 
@@ -8,6 +8,25 @@ export default function Login() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // One login with the customer site (2026-10-09): a member signed in there
+  // who opens Tara arrives at /login#code=XXXX and is signed in here with the
+  // same code, without typing it. The code is read from the #fragment (never
+  // sent to a server or logged) and cleared from the address bar first.
+  const handoffTried = useRef(false);
+  useEffect(() => {
+    if (handoffTried.current) return;
+    handoffTried.current = true;
+    const handoff = new URLSearchParams(window.location.hash.slice(1)).get("code");
+    if (!handoff) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    setCode(handoff.toUpperCase());
+    setBusy(true);
+    signIn(handoff.trim().toUpperCase())
+      .then(() => navigate("/chat", { replace: true }))
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Something went wrong."))
+      .finally(() => setBusy(false));
+  }, [signIn, navigate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
