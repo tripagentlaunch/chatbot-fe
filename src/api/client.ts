@@ -18,15 +18,34 @@ export class ApiError extends Error {
   }
 }
 
+export const OFFLINE_MESSAGE = "We couldn't reach Tara just now. Please try again in a moment.";
+
+// The backend can be waking up or mid-deploy (2026-10-12): the request then
+// fails with no response at all, which showed as "Something went wrong."
+// Network failures and 502-504s are retried a few times before giving up.
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  const waits = [1500, 4000, 8000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (![502, 503, 504].includes(res.status) || attempt >= waits.length) return res;
+    } catch {
+      if (attempt >= waits.length) throw new ApiError(0, OFFLINE_MESSAGE);
+    }
+    await new Promise((r) => setTimeout(r, waits[attempt]));
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const res = await fetchWithRetry(`${BASE_URL}${path}`, { ...options, headers });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiError(res.status, body.error ?? "Something went wrong.");
+    const body = await res.json().catch(() => ({}));
+    const msg = body.error ?? body.detail?.error ?? (res.status >= 500 ? OFFLINE_MESSAGE : "Something went wrong.");
+    throw new ApiError(res.status, msg);
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }
@@ -52,8 +71,9 @@ export async function streamChat(
     body: JSON.stringify({ message, chatId }),
   });
   if (!res.ok || !res.body) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiError(res.status, body.error ?? "Something went wrong.");
+    const body = await res.json().catch(() => ({}));
+    const msg = body.error ?? body.detail?.error ?? (res.status >= 500 ? OFFLINE_MESSAGE : "Something went wrong.");
+    throw new ApiError(res.status, msg);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

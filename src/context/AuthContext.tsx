@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, getToken, setToken } from "../api/client";
 import type { Member } from "../types";
 
@@ -15,25 +15,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Bumped by every sign-in/out (2026-10-12): the saved-session check below
+  // could finish after a fresh sign-in and put the previous member (an old
+  // code) back. Results from an earlier generation are ignored.
+  const generation = useRef(0);
+
   useEffect(() => {
     if (!getToken()) {
       setLoading(false);
       return;
     }
+    const gen = generation.current;
     api
       .get<{ member: Member }>("/api/session")
-      .then((res) => setMember(res.member))
-      .catch(() => setToken(null))
+      .then((res) => {
+        if (gen === generation.current) setMember(res.member);
+      })
+      .catch(() => {
+        if (gen === generation.current) setToken(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const signIn = useCallback(async (code: string) => {
+    const gen = ++generation.current;
+    // A new code replaces whatever was signed in before, even if it fails.
+    setToken(null);
+    setMember(null);
     const res = await api.post<{ member: Member; token: string }>("/api/session", { code });
+    if (gen !== generation.current) return;
     setToken(res.token);
     setMember(res.member);
+    setLoading(false);
   }, []);
 
   const signOut = useCallback(() => {
+    generation.current++;
     setToken(null);
     setMember(null);
   }, []);
