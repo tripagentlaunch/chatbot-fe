@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  // Back to the page that sent them here (only same-site /trips/... paths), else chat.
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const next = from && from.startsWith("/trips/") ? from : "/chat";
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,10 +28,10 @@ export default function Login() {
     setCode(clean(handoff));
     setBusy(true);
     signIn(clean(handoff))
-      .then(() => navigate("/chat", { replace: true }))
+      .then(() => navigate(next, { replace: true }))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Something went wrong."))
       .finally(() => setBusy(false));
-  }, [signIn, navigate]);
+  }, [signIn, navigate, next]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,7 +39,7 @@ export default function Login() {
     setBusy(true);
     try {
       await signIn(clean(code));
-      navigate("/chat");
+      navigate(next, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {

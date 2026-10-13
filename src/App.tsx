@@ -1,4 +1,4 @@
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
@@ -7,8 +7,10 @@ import Trips from "./pages/Trips";
 
 function Protected({ children }: { children: JSX.Element }) {
   const { member, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <p className="muted">Loading...</p>;
-  if (!member) return <Navigate to="/login" replace />;
+  // Remember where they were headed (e.g. an itinerary link from WhatsApp).
+  if (!member) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return children;
 }
 
