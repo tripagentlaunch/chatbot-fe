@@ -109,6 +109,8 @@ main {
   max-width: 80%;
   line-height: 1.45;
   white-space: pre-wrap;
+  /* Itinerary links are one long unbroken word — let them wrap. */
+  overflow-wrap: anywhere;
 }
 .bubble-user {
   align-self: flex-end;
