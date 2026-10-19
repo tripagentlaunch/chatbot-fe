@@ -13,12 +13,19 @@
   --tc-champagne: #d8c29a;
   --tc-amber: #f2b879;
   --tc-font: "Jost", -apple-system, "Helvetica Neue", sans-serif;
+  /* Side gutter that keeps header, thread and composer in one centred column
+     on wide screens and 16px from the edge on a phone. */
+  --tc-gutter: max(16px, calc((100% - 760px) / 2));
+  /* Header height: the nav row, then Tara's row. */
+  --tc-head: calc(env(safe-area-inset-top) + 124px);
 
-  position: relative;
+  /* Pinned to the viewport: the document itself never scrolls, so the header
+     can't scroll away and Safari's toolbar never slides over the composer. */
+  position: fixed;
+  inset: 0;
   isolation: isolate;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
   overflow: hidden;
   background: var(--tc-ink);
   color: var(--tc-ivory);
@@ -26,6 +33,15 @@
   font-size: 16px;
   line-height: 24px;
   -webkit-font-smoothing: antialiased;
+}
+/* While the chat surface is up, the page behind it matches it (no light band
+   above/below it in Safari, no rubber-band scroll of the body). */
+html:has(.tc-root),
+html:has(.tc-root) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #0a0a0b;
 }
 .tc-root *,
 .tc-root *::before,
@@ -66,10 +82,15 @@
   right: 0;
   z-index: 3;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) var(--tc-gutter) 12px;
+  pointer-events: none;
+}
+.tc-header__bar {
+  display: flex;
   align-items: center;
   gap: 12px;
-  padding: max(54px, calc(env(safe-area-inset-top) + 12px)) 16px 12px;
-  pointer-events: none;
 }
 .tc-header > * {
   pointer-events: auto;
@@ -79,14 +100,16 @@
   left: 0;
   right: 0;
   top: 0;
-  bottom: -20px;
+  bottom: -24px;
   z-index: -1;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(8, 6, 5, 0.5) 0%, rgba(8, 6, 5, 0.38) 60%, rgba(8, 6, 5, 0) 100%);
-  -webkit-backdrop-filter: blur(20px) saturate(1.15);
-  backdrop-filter: blur(20px) saturate(1.15);
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 66%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 66%, transparent 100%);
+  /* Solid enough under both rows that the thread never reads through the
+     nav or Tara's name; it only fades over the last 24px. */
+  background: linear-gradient(180deg, rgba(8, 6, 5, 0.78) 0%, rgba(8, 6, 5, 0.66) 80%, rgba(8, 6, 5, 0) 100%);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 82%, transparent 100%);
 }
 .tc-iconbtn {
   flex: none;
@@ -158,7 +181,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: calc(max(54px, env(safe-area-inset-top) + 12px) + 56px) 24px 132px;
+  padding: calc(var(--tc-head) + 8px) calc(var(--tc-gutter) + 8px) calc(env(safe-area-inset-bottom) + 108px);
+}
+/* Trips: the header is just the nav row. */
+.tc-scroll--page {
+  padding-top: calc(env(safe-area-inset-top) + 76px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
 }
 .tc-scroll::-webkit-scrollbar {
   display: none;
@@ -213,13 +241,13 @@
   text-decoration: underline;
 }
 .tc-msg--member {
-  max-width: 300px;
+  max-width: min(440px, 82%);
   border-radius: 22px 22px 6px 22px;
   background: #ffffff;
   color: #191613;
 }
 .tc-msg--tara {
-  max-width: 342px;
+  max-width: min(560px, 92%);
   border-radius: 22px 22px 22px 6px;
   background: rgba(84, 84, 90, 0.55);
   -webkit-backdrop-filter: blur(18px) saturate(1.1);
@@ -300,8 +328,8 @@
 .tc-chips {
   display: flex;
   gap: 8px;
-  margin: 0 -24px;
-  padding: 0 24px;
+  margin: 0 calc(-1 * (var(--tc-gutter) + 8px));
+  padding: 0 calc(var(--tc-gutter) + 8px);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -330,14 +358,14 @@
 .tc-dock {
   position: absolute;
   z-index: 4;
-  left: 16px;
-  right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
+  left: var(--tc-gutter);
+  right: var(--tc-gutter);
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
 }
 .tc-toast {
   position: absolute;
   z-index: 5;
-  top: max(104px, calc(env(safe-area-inset-top) + 62px));
+  top: calc(var(--tc-head) + 4px);
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -413,6 +441,178 @@
 .tc-composer__btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ---- app nav: part of the header glass ----------------------------------- */
+.tc-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+}
+.tc-wordmark {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 19px;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+  color: var(--tc-ivory);
+  white-space: nowrap;
+}
+.tc-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 237, 228, 0.14);
+  background: rgba(32, 32, 35, 0.6);
+}
+.tc-tab {
+  padding: 5px 14px;
+  border-radius: 999px;
+  color: var(--tc-ivory-3);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.tc-tab.active {
+  background: var(--tc-ivory);
+  color: var(--tc-ink);
+}
+.tc-account {
+  position: relative;
+  flex: none;
+}
+.tc-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(216, 194, 154, 0.5);
+  background: #202023;
+  color: var(--tc-champagne);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tc-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 6;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(13, 13, 15, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.tc-menu__who {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid rgba(242, 237, 228, 0.1);
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.tc-menu__who span {
+  color: var(--tc-ivory-3);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.tc-menu__item {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tc-menu__item:hover {
+  background: rgba(242, 237, 228, 0.08);
+}
+
+/* ---- trips ------------------------------------------------------------------ */
+.tc-page-title {
+  margin: 8px 0 4px;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 36px;
+  letter-spacing: -0.015em;
+}
+.tc-empty {
+  margin: 0;
+  color: var(--tc-ivory-2);
+}
+.tc-trips {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.tc-trip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(84, 84, 90, 0.42);
+  border: 1px solid rgba(190, 190, 196, 0.26);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+  color: var(--tc-ivory);
+  text-decoration: none;
+}
+.tc-trip h3 {
+  margin: 0;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 23px;
+}
+.tc-trip__meta,
+.tc-trip__places {
+  margin: 0;
+  color: var(--tc-ivory-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.tc-trip__places {
+  color: var(--tc-ivory-3);
+}
+.tc-trip__status {
+  align-self: flex-start;
+  padding: 1px 8px;
+  border: 1px solid rgba(216, 194, 154, 0.5);
+  border-radius: 999px;
+  color: var(--tc-champagne);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: capitalize;
+}
+
+/* Small phones: tighter nav so wordmark, tabs and account fit one row. */
+@media (max-width: 360px) {
+  .tc-nav {
+    gap: 10px;
+  }
+  .tc-wordmark {
+    font-size: 17px;
+  }
+  .tc-tab {
+    padding: 5px 11px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

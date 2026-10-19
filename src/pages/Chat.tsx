@@ -4,6 +4,7 @@ import MessageBubble from "../components/MessageBubble";
 import { api, ApiError, streamChat } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
+import TopNav from "../design/TopNav";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -251,46 +252,49 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
       <header className="tc-header">
         <span className="tc-header__glass" aria-hidden="true" />
-        {onBack ? (
-          <button type="button" className="tc-iconbtn" aria-label="Back" onClick={onBack}>
-            <ChevronLeft />
-          </button>
-        ) : (
-          <a
-            className="tc-iconbtn"
-            href={`https://wa.me/${WHATSAPP_INTL}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Chat on WhatsApp"
-            title="Chat on WhatsApp"
-          >
-            <WhatsApp />
-          </a>
-        )}
-        <div className="tc-header__title">
-          <span className="tc-title">
-            Tara <span className="tc-badge">AI</span>
-          </span>
-          <div className="tc-status">
-            <i aria-hidden="true" />
-            Here
+        <TopNav />
+        <div className="tc-header__bar">
+          {onBack ? (
+            <button type="button" className="tc-iconbtn" aria-label="Back" onClick={onBack}>
+              <ChevronLeft />
+            </button>
+          ) : (
+            <a
+              className="tc-iconbtn"
+              href={`https://wa.me/${WHATSAPP_INTL}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Chat on WhatsApp"
+              title="Chat on WhatsApp"
+            >
+              <WhatsApp />
+            </a>
+          )}
+          <div className="tc-header__title">
+            <span className="tc-title">
+              Tara <span className="tc-badge">AI</span>
+            </span>
+            <div className="tc-status">
+              <i aria-hidden="true" />
+              Here
+            </div>
           </div>
+          {onCall ? (
+            <button type="button" className="tc-iconbtn" aria-label="Speak to the Desk" onClick={onCall}>
+              <Phone />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="tc-iconbtn"
+              aria-label="Talk to a human agent"
+              title="Talk to a human agent"
+              onClick={talkToHuman}
+            >
+              <Phone />
+            </button>
+          )}
         </div>
-        {onCall ? (
-          <button type="button" className="tc-iconbtn" aria-label="Speak to the Desk" onClick={onCall}>
-            <Phone />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="tc-iconbtn"
-            aria-label="Talk to a human agent"
-            title="Talk to a human agent"
-            onClick={talkToHuman}
-          >
-            <Phone />
-          </button>
-        )}
       </header>
 
       {agentNote && (
