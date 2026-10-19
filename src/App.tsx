@@ -63,10 +63,10 @@ export default function App() {
         <Route
           path="/trips/:key"
           element={
+            // Full-width itinerary page with its own header (the TripAgent
+            // wordmark links back to chat), not the app's 720px column.
             <Protected>
-              <Layout>
-                <TripDetail />
-              </Layout>
+              <TripDetail />
             </Protected>
           }
         />
