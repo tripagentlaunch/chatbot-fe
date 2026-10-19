@@ -1,4 +1,4 @@
-import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
@@ -14,27 +14,6 @@ function Protected({ children }: { children: JSX.Element }) {
   return children;
 }
 
-function Layout({ children }: { children: JSX.Element }) {
-  const { member, signOut } = useAuth();
-  return (
-    <div className="app-shell">
-      <header className="app-header">
-        <span className="brand">TripAgent</span>
-        <nav>
-          <NavLink to="/chat">Chat</NavLink>
-          <NavLink to="/trips">Trips</NavLink>
-        </nav>
-        {member && (
-          <button className="link-button" onClick={signOut}>
-            Sign out ({member.name})
-          </button>
-        )}
-      </header>
-      <main>{children}</main>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <AuthProvider>
@@ -43,20 +22,18 @@ export default function App() {
         <Route
           path="/chat"
           element={
+            // Full-screen Tara surface; the app nav lives in its header.
             <Protected>
-              <Layout>
-                <Chat />
-              </Layout>
+              <Chat />
             </Protected>
           }
         />
         <Route
           path="/trips"
           element={
+            // Full-screen Tara surface; the app nav lives in its header.
             <Protected>
-              <Layout>
-                <Trips />
-              </Layout>
+              <Trips />
             </Protected>
           }
         />

@@ -4,6 +4,7 @@ import MessageBubble from "../components/MessageBubble";
 import { api, ApiError, streamChat } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
+import TopNav from "../design/TopNav";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone } from "../design/icons";
 import "../design/chat.css";
 
@@ -172,29 +173,32 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
       <header className="tc-header">
         <span className="tc-header__glass" aria-hidden="true" />
-        {onBack ? (
-          <button type="button" className="tc-iconbtn" aria-label="Back" onClick={onBack}>
-            <ChevronLeft />
-          </button>
-        ) : (
-          <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
-        )}
-        <div className="tc-header__title">
-          <span className="tc-title">
-            Tara <span className="tc-badge">AI</span>
-          </span>
-          <div className="tc-status">
-            <i aria-hidden="true" />
-            Here
+        <TopNav />
+        <div className="tc-header__bar">
+          {onBack ? (
+            <button type="button" className="tc-iconbtn" aria-label="Back" onClick={onBack}>
+              <ChevronLeft />
+            </button>
+          ) : (
+            <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
+          )}
+          <div className="tc-header__title">
+            <span className="tc-title">
+              Tara <span className="tc-badge">AI</span>
+            </span>
+            <div className="tc-status">
+              <i aria-hidden="true" />
+              Here
+            </div>
           </div>
+          {onCall ? (
+            <button type="button" className="tc-iconbtn" aria-label="Speak to the Desk" onClick={onCall}>
+              <Phone />
+            </button>
+          ) : (
+            <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
+          )}
         </div>
-        {onCall ? (
-          <button type="button" className="tc-iconbtn" aria-label="Speak to the Desk" onClick={onCall}>
-            <Phone />
-          </button>
-        ) : (
-          <span className="tc-iconbtn tc-iconbtn--spacer" aria-hidden="true" />
-        )}
       </header>
 
       <div className="tc-scroll">
