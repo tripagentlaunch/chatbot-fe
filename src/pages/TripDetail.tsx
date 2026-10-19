@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import "../design/itinerary.css";
@@ -615,9 +615,11 @@ function heroPhoto(plan: TripPlan | Comparison): string | undefined {
 
 export default function TripDetail() {
   const { key } = useParams<{ key: string }>();
-  const { member } = useAuth();
+  const { member, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState<PlanResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; otherMember: boolean } | null>(null);
   const [tab, setTab] = useState("");
 
   useEffect(() => {
@@ -625,14 +627,55 @@ export default function TripDetail() {
     api
       .get<PlanResponse>(`/api/plan/${key}`)
       .then(setData)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load this trip."));
+      .catch((err) =>
+        setError({
+          message: err instanceof ApiError ? err.message : "Could not load this trip.",
+          otherMember: err instanceof ApiError && err.status === 403,
+        })
+      );
   }, [key]);
 
-  if (error || !data) {
+  if (error) {
+    // Signed in with someone else's code: sign out and come straight back
+    // here after signing in with the right one.
+    const switchAccount = () => {
+      signOut();
+      navigate("/login", { replace: true, state: { from: location.pathname } });
+    };
     return (
       <div className="pv-page">
         <div className="pv-shell">
-          <p className={error ? "error" : "muted"}>{error || "Loading..."}</p>
+          <div className="pv-card" style={{ padding: "40px 48px" }}>
+            <span className="pv-wordmark" style={{ color: "var(--ink)" }}>
+              <Link to="/chat">TripAgent</Link>
+            </span>
+            <h1 className="pv-section-title" style={{ marginTop: 28 }}>
+              {error.otherMember ? "This itinerary is for another account" : "We couldn't open this itinerary"}
+            </h1>
+            <p className="pv-day-body" style={{ fontSize: 14 }}>
+              {error.otherMember
+                ? `You're signed in${member && member.name !== "Traveller" ? ` as ${member.name}` : ""}. Sign in with the access code of the person this itinerary was made for.`
+                : error.message}
+            </p>
+            {error.otherMember ? (
+              <button type="button" className="pv-cta" style={{ marginLeft: 0 }} onClick={switchAccount}>
+                Sign in with a different code
+              </button>
+            ) : (
+              <Link to="/chat" className="pv-cta" style={{ marginLeft: 0, textDecoration: "none" }}>
+                Back to chat
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="pv-page">
+        <div className="pv-shell">
+          <p className="muted">Loading...</p>
         </div>
       </div>
     );
