@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import ChatInput from "../components/ChatInput";
 import MessageBubble from "../components/MessageBubble";
-import { api, ApiError, streamChat } from "../api/client";
+import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
@@ -44,6 +44,13 @@ const SUGGESTIONS = [
 
 const FAILED_TEXT = "Tara could not finish a reply. Your message is kept here; try again.";
 
+/** The member's line as the conversation keeps it: the files by name (chatbot-be uploads.with_note). */
+function withFileNote(text: string, files: ChatAttachment[]): string {
+  if (!files.length) return text;
+  const line = `📎 ${files.map((f) => f.name).join(", ")}`;
+  return text ? `${text}\n\n${line}` : line;
+}
+
 interface Props {
   /** First name, for the greeting. */
   memberName?: string;
@@ -82,6 +89,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [agentNote, setAgentNote] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
   const lastSent = useRef("");
+  const lastFiles = useRef<ChatAttachment[]>([]);
   const seeded = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Live sync: how many raw history messages we've already reflected locally,
@@ -157,16 +165,17 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   }, [messages, pending, activity]);
 
   /** `resend`: the member's line is already in the thread, so repeat the turn, not the bubble. */
-  async function send(text: string, resend = false) {
+  async function send(text: string, resend = false, files: ChatAttachment[] = []) {
     setBusy(true);
     busyRef.current = true;
     setPending("");
     setActivity(null);
     lastSent.current = text;
+    lastFiles.current = files;
     if (resend) {
       setMessages((prev) => prev.filter((m) => !m.failed));
     } else {
-      setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text, at: Date.now() }]);
+      setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", text: withFileNote(text, files), at: Date.now() }]);
     }
     const fail = (message?: string) =>
       setMessages((prev) => [
@@ -194,7 +203,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
         } else if (event.type === "error") {
           fail();
         }
-      });
+      }, files);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onAuthError?.();
@@ -207,6 +216,9 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           ...prev.filter((m) => !m.failed),
           { id: `cap-${Date.now()}`, role: "assistant", text: err.message, at: Date.now() },
         ]);
+      } else if (err instanceof ApiError && (err.status === 413 || err.status === 422)) {
+        // A file the desk can't take (too large, unknown type): say which and why.
+        fail(err.message);
       } else if (err instanceof ApiError && err.status === 429) {
         // Rate limit / daily cap: show the server's own message, still retryable.
         fail(err.message);
@@ -338,7 +350,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
                 )}
                 <MessageBubble role={m.role} text={m.text} failed={m.failed} />
                 {m.failed && lastIsFailed && !busy && (
-                  <button type="button" className="tc-link" onClick={() => send(lastSent.current, true)}>
+                  <button type="button" className="tc-link" onClick={() => send(lastSent.current, true, lastFiles.current)}>
                     Try that again
                   </button>
                 )}
@@ -385,7 +397,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
         {capped ? (
           <p className="tc-capped" role="status">{capped}</p>
         ) : (
-          <ChatInput disabled={busy} onSend={(t) => send(t)} value={draft} onChange={setDraft} />
+          <ChatInput disabled={busy} onSend={(t, files) => send(t, false, files)} value={draft} onChange={setDraft} />
         )}
       </div>
     </div>

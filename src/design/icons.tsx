@@ -66,6 +66,18 @@ export const WhatsApp = ({ size }: { size?: number }) => (
   </Svg>
 );
 
+export const Paperclip = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="m20 11.5-7.8 7.8a5 5 0 0 1-7-7l8.3-8.4a3.4 3.4 0 0 1 4.8 4.8l-8.3 8.4a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6" />
+  </Svg>
+);
+
+export const Close = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+
 /** Tara's mark: a sun on the horizon. */
 export const Horizon = ({ size = 18 }: { size?: number }) => (
   <Svg size={size} strokeWidth={1.6}>
