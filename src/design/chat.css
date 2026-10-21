@@ -362,6 +362,39 @@ html:has(.tc-root) body {
   right: var(--tc-gutter);
   bottom: calc(env(safe-area-inset-bottom) + 12px);
 }
+.tc-toast {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--tc-head) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--tc-ivory, #f2ede4);
+  background: rgba(13, 13, 15, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.tc-capped {
+  margin: 0;
+  padding: 16px 20px;
+  border-radius: 20px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(13, 13, 15, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.5);
+}
 .tc-composer {
   display: flex;
   align-items: center;
@@ -408,6 +441,66 @@ html:has(.tc-root) body {
 .tc-composer__btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* Attach: the header's dark icon button, so it reads as secondary to Send. */
+.tc-composer__btn--ghost {
+  background: #202023;
+  color: var(--tc-ivory);
+  border: 1px solid rgba(242, 237, 228, 0.18);
+}
+
+/* ---- attached files: chips above the composer ---------------------------- */
+.tc-composer-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tc-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 6px;
+}
+.tc-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 237, 228, 0.18);
+  background: rgba(32, 32, 35, 0.9);
+  color: var(--tc-ivory);
+  font-size: 13px;
+  line-height: 20px;
+}
+.tc-file__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.tc-file__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tc-ivory-3);
+  cursor: pointer;
+}
+.tc-file__remove:hover {
+  color: var(--tc-ivory);
+  background: rgba(242, 237, 228, 0.08);
+}
+.tc-file-error {
+  width: 100%;
+  color: #e8a598;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 /* ---- app nav: part of the header glass ----------------------------------- */
