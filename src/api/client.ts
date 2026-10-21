@@ -56,10 +56,18 @@ export const api = {
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
 };
 
+/** A file the member attached in the composer: base64 without the data: prefix. */
+export interface ChatAttachment {
+  name: string;
+  mediaType: string;
+  data: string;
+}
+
 export async function streamChat(
   message: string,
   chatId: string | undefined,
   onEvent: (event: Record<string, unknown>) => void,
+  attachments: ChatAttachment[] = [],
 ): Promise<void> {
   const token = getToken();
   const res = await fetch(`${BASE_URL}/api/chat/stream`, {
@@ -68,7 +76,7 @@ export async function streamChat(
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message, chatId }),
+    body: JSON.stringify(attachments.length ? { message, chatId, attachments } : { message, chatId }),
   });
   if (!res.ok || !res.body) {
     const body = await res.json().catch(() => ({}));
