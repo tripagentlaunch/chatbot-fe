@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -604,6 +605,17 @@ function OptionTab({ o }: { o: Option }) {
   );
 }
 
+/** Every photo on the page has loaded (or failed), hero included, or the wait ran out. */
+function photosReady(root: HTMLElement | null, hero: string | undefined, maxMs = 8000): Promise<void> {
+  const imgs = root ? Array.from(root.querySelectorAll("img")) : [];
+  const waits = imgs.map((img) => {
+    img.loading = "eager";
+    return img.complete ? Promise.resolve() : new Promise<void>((res) => { img.onload = img.onerror = () => res(); });
+  });
+  if (hero) waits.push(new Promise<void>((res) => { const i = new Image(); i.onload = i.onerror = () => res(); i.src = hero; }));
+  return Promise.race([Promise.all(waits).then(() => undefined), new Promise<void>((res) => setTimeout(res, maxMs))]);
+}
+
 function heroPhoto(plan: TripPlan | Comparison): string | undefined {
   const groups = plan.kind === "compare" ? plan.options.flatMap((o) => o.hotelOptions || []) : plan.hotelOptions || [];
   for (const g of groups) {
@@ -621,6 +633,20 @@ export default function TripDetail() {
   const [data, setData] = useState<PlanResponse | null>(null);
   const [error, setError] = useState<{ message: string; otherMember: boolean } | null>(null);
   const [tab, setTab] = useState("");
+  // The PDF is the whole itinerary (2026-10-22): every tab one after another,
+  // every day, every photo, not just the tab on screen.
+  const [printAll, setPrintAll] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const before = () => flushSync(() => setPrintAll(true));   // also for ⌘P / Ctrl+P
+    const after = () => setPrintAll(false);
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, []);
 
   useEffect(() => {
     if (!key) return;
@@ -691,8 +717,37 @@ export default function TripDetail() {
   const name = member && member.name !== "Traveller" ? member.name : null;
   const madeFor = [name ? `Made for ${name}` : null, asof].filter(Boolean).join(" · ");
 
+  const downloadPdf = async () => {
+    flushSync(() => setPrintAll(true));
+    await photosReady(cardRef.current, hero);
+    window.print();
+  };
+
   let content: ReactNode;
-  if (plan.kind === "compare") {
+  if (printAll) {
+    content = plan.kind === "compare" ? (
+      plan.options.map((o, i) => (
+        <section key={o.name} className={"pv-print-section" + (i ? " pv-print-break" : "")}>
+          <h2 className="pv-section-title">{o.name}</h2>
+          <OptionTab o={o} />
+        </section>
+      ))
+    ) : (
+      <>
+        <section className="pv-print-section">
+          <PlanTab plan={plan} onDays={() => setTab("Days")} />
+        </section>
+        {plan.days.length ? (
+          <section className="pv-print-section pv-print-break">
+            <DaysTab plan={plan} />
+          </section>
+        ) : null}
+        <section className="pv-print-section pv-print-break">
+          <DecisionsTab plan={plan} />
+        </section>
+      </>
+    );
+  } else if (plan.kind === "compare") {
     const o = plan.options.find((x) => x.name === active) || plan.options[0];
     content = o ? <OptionTab o={o} /> : null;
   } else if (active === "Days") {
@@ -706,7 +761,7 @@ export default function TripDetail() {
   return (
     <div className="pv-page">
       <div className="pv-shell">
-        <div className="pv-card">
+        <div className="pv-card" ref={cardRef}>
           <div className="pv-hero" style={hero ? { backgroundImage: `url("${hero}")` } : undefined}>
             <div className="pv-hero-scrim" />
             <div className="pv-hero-content">
@@ -717,7 +772,7 @@ export default function TripDetail() {
                   </span>
                   {madeFor ? <span className="pv-madefor">{madeFor}</span> : null}
                 </div>
-                <button type="button" className="pv-dlbtn" onClick={() => window.print()}>
+                <button type="button" className="pv-dlbtn" onClick={downloadPdf}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -733,7 +788,7 @@ export default function TripDetail() {
             <div className="pv-tabs">
               <Tabs tabs={tabs} active={active} onPick={setTab} />
             </div>
-            <div key={active} className="pv-tabcontent">
+            <div key={printAll ? "print" : active} className="pv-tabcontent">
               {content}
             </div>
             <div className="pv-footnote">
