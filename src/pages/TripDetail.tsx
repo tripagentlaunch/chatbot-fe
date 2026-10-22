@@ -463,8 +463,8 @@ function DaysTab({ plan }: { plan: TripPlan }) {
             <div className="pv-day-card" key={i}>
               <div className="pv-day-card-body">
                 <div className="pv-recgroup-eyebrow">Day {i + 1}</div>
-                <div className="pv-day-head">{date ? `${date} · ${day.t}` : day.t}</div>
-                {day.place || day.m ? <div className="pv-day-place">{day.place || day.m}</div> : null}
+                <div className="pv-day-head">{[date, day.t].filter(Boolean).join(" · ") || `Day ${i + 1}`}</div>
+                {(day.place || day.m) && (day.place || day.m) !== day.t ? <div className="pv-day-place">{day.place || day.m}</div> : null}
                 {day.d ? <div className="pv-day-body">{day.d}</div> : null}
                 {day.highlights?.length ? (
                   <ul className="pv-bullets" style={{ marginTop: 8 }}>
