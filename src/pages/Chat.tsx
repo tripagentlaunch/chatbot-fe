@@ -260,7 +260,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
   function talkToHuman() {
     navigator.clipboard?.writeText(HUMAN_AGENT_NUMBER).catch(() => {});
-    setAgentNote(`${HUMAN_AGENT_NUMBER} copied — connecting you to a human agent…`);
+    setAgentNote(`${HUMAN_AGENT_NUMBER} copied. Connecting you to a human agent…`);
     window.setTimeout(() => setAgentNote(null), 3500);
     window.location.href = `tel:${HUMAN_AGENT_NUMBER}`;
   }

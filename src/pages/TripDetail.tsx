@@ -205,7 +205,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
       {f ? (
         <div className="pv-recflight-row">
           <div>
-            <div className="pv-recflight-time">{f.depTime || "—"}</div>
+            <div className="pv-recflight-time">{f.depTime || "TBC"}</div>
             <div className="pv-recflight-city">{f.depCity}</div>
           </div>
           <div className="pv-recflight-mid">
@@ -214,7 +214,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
             <div className="pv-recflight-sub">{[f.duration, f.cabin].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="pv-recflight-time">{f.arrTime || "—"}</div>
+            <div className="pv-recflight-time">{f.arrTime || "TBC"}</div>
             <div className="pv-recflight-city">{f.arrCity}</div>
           </div>
         </div>
@@ -259,7 +259,7 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
         <OptionName c={c} block />
         {c.flight ? (
           <div className="pv-option-timing">
-            {c.flight.depTime || "—"} – {c.flight.arrTime || "—"}
+            {c.flight.depTime || "TBC"} – {c.flight.arrTime || "TBC"}
           </div>
         ) : null}
         <div className="pv-option-detail">{c.details}</div>
@@ -517,7 +517,7 @@ function DecisionsTab({ plan }: { plan: TripPlan }) {
             {plan.decisions.map((r, i) => (
               <li key={i}>
                 <strong>{r.t}</strong>
-                {r.d ? ` — ${r.d}` : ""}
+                {r.d ? `: ${r.d}` : ""}
               </li>
             ))}
           </ul>
@@ -739,7 +739,7 @@ export default function TripDetail() {
             <div className="pv-footnote">
               {prepared ? `Prepared ${prepared}. ` : ""}
               {compare && plan.method ? `${plan.method} ` : ""}
-              Fares and room rates are indicative, from a live search — nothing is booked, held or paid.
+              Fares and room rates are indicative, from a live search: nothing is booked, held or paid.
             </div>
           </div>
         </div>
