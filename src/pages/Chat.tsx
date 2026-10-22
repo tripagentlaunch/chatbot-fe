@@ -92,6 +92,11 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const lastFiles = useRef<ChatAttachment[]>([]);
   const seeded = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Shown under the thread while an advisor has the chat; gone once anyone replies.
+  const [heldNote, setHeldNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (heldNote && messages[messages.length - 1]?.role === "assistant") setHeldNote(null);
+  }, [messages, heldNote]);
   // Live sync: how many raw history messages we've already reflected locally,
   // plus flags so the background poll doesn't fight an in-flight turn or the
   // initial load. Lets a desk advisor's reply (written into history server-side)
@@ -188,6 +193,13 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           setPending((prev) => prev + (event.delta as string));
         } else if (event.type === "tool") {
           setActivity(`Using ${event.name as string}...`);
+        } else if (event.type === "done" && event.held) {
+          // An advisor has taken this chat over: Tara stays quiet and the
+          // advisor's reply arrives through the history poll (2026-10-22).
+          setHeldNote(typeof event.note === "string" ? event.note : "Your advisor will reply here shortly.");
+          serverLenRef.current += 1; // only the member's message was stored
+          setPending("");
+          setActivity(null);
         } else if (event.type === "done") {
           const replies = (event.messages as string[]) ?? [];
           setMessages((prev) => [
@@ -358,6 +370,8 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             </Fragment>
           );
         })}
+
+        {heldNote && !busy && <p className="tc-activity" role="status">{heldNote}</p>}
 
         {(pending || busy) && (
           <div className="tc-row">
