@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp, Close, Mic, Paperclip, Waveform } from "../design/icons";
 import type { ChatAttachment } from "../api/client";
+import { useAssistantName } from "../context/AuthContext";
 
 // Upstream (chatbot-fe/dev): a textarea and a Send button, with its own text state.
 // Ours adds: a text value the page can set (suggestions, links from other screens),
@@ -55,6 +56,7 @@ function recognitionCtor(): RecognitionCtor | null {
 }
 
 export default function ChatInput({ disabled, onSend, value: controlled, onChange }: Props) {
+  const assistant = useAssistantName();
   const [inner, setInner] = useState("");
   const value = controlled ?? inner;
   const setValue = (v: string) => (onChange ? onChange(v) : setInner(v));
@@ -72,7 +74,7 @@ export default function ChatInput({ disabled, onSend, value: controlled, onChang
     const added: ChatAttachment[] = [];
     for (const file of picked.slice(0, Math.max(0, room))) {
       if (!KINDS.has(file.type)) {
-        setFileError(`${file.name}: Tara can read photos, PDFs and text files.`);
+        setFileError(`${file.name}: ${assistant} can read photos, PDFs and text files.`);
         continue;
       }
       if (file.size > MAX_BYTES) {
@@ -194,8 +196,8 @@ export default function ChatInput({ disabled, onSend, value: controlled, onChang
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Ask Tara…"
-        aria-label="Ask Tara"
+        placeholder={`Ask ${assistant}…`}
+        aria-label={`Ask ${assistant}`}
         rows={1}
         disabled={disabled}
       />

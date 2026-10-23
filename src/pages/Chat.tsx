@@ -5,7 +5,7 @@ import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
-import { useAuth } from "../context/AuthContext";
+import { useAssistantName, useAuth } from "../context/AuthContext";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -45,7 +45,7 @@ const SUGGESTIONS = [
 
 /** How long a reply may take to start before the chat says the advisor is searching. */
 const SLOW_REPLY_MS = 8000;
-const FAILED_TEXT = "Tara could not finish a reply. Your message is kept here; try again.";
+const failedText = (who: string) => `${who} could not finish a reply. Your message is kept here; try again.`;
 
 /** The member's line as the conversation keeps it: the files by name (chatbot-be uploads.with_note). */
 function withFileNote(text: string, files: ChatAttachment[]): string {
@@ -83,6 +83,7 @@ function timeOfDay(): string {
 
 export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
   const advisorName = useAuth().member?.advisorName?.trim() || null;
+  const assistant = useAssistantName();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [pending, setPending] = useState("");
   const [activity, setActivity] = useState<string | null>(null);
@@ -197,7 +198,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
     const fail = (message?: string) =>
       setMessages((prev) => [
         ...prev.filter((m) => !m.failed),
-        { id: `f-${Date.now()}`, role: "assistant", text: message || FAILED_TEXT, at: Date.now(), failed: true },
+        { id: `f-${Date.now()}`, role: "assistant", text: message || failedText(assistant), at: Date.now(), failed: true },
       ]);
     try {
       await streamChat(text, chatId, (event) => {
@@ -369,7 +370,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
                 {firstOfRun && (
                   <p className="tc-label">
                     <Horizon />
-                    Tara
+                    {assistant}
                   </p>
                 )}
                 <MessageBubble role={m.role} text={m.text} failed={m.failed} />
@@ -390,7 +391,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             {messages[messages.length - 1]?.role !== "assistant" && (
               <p className="tc-label">
                 <Horizon />
-                Tara
+                {assistant}
               </p>
             )}
             {pending && <MessageBubble role="assistant" text={pending} streaming />}
@@ -409,7 +410,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
         {!busy && !capped && (hasReply || empty) && (
           <div className="tc-chips-wrap">
-            <p className="tc-chips-label">Explore with Tara</p>
+            <p className="tc-chips-label">Explore with {assistant}</p>
             <div className="tc-chips">
               {SUGGESTIONS.map((s) => (
                 <button

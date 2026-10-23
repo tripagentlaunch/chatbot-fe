@@ -64,4 +64,9 @@ export function useAuth(): AuthState {
   return ctx;
 }
 
+/** Who the member talks to: their advisor's name when they have one, otherwise Tara. */
+export function useAssistantName(): string {
+  return useAuth().member?.advisorName?.trim() || "Tara";
+}
+
 export { ApiError };
