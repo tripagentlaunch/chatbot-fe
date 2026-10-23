@@ -18,7 +18,7 @@ export class ApiError extends Error {
   }
 }
 
-export const OFFLINE_MESSAGE = "We couldn't reach Tara just now. Please try again in a moment.";
+export const OFFLINE_MESSAGE = "We couldn't reach your advisor just now. Please try again in a moment.";
 
 // The backend can be waking up or mid-deploy (2026-10-12): the request then
 // fails with no response at all, which showed as "Something went wrong."
