@@ -2,6 +2,8 @@ export interface Member {
   code: string;
   name: string;
   tier: "Private Tier Black" | "Private Tier Ash" | "Invited Guest";
+  /** The advisor assigned to this member, when there is one. */
+  advisorName?: string | null;
 }
 
 export interface HistoryMessage {

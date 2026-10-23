@@ -5,6 +5,7 @@ import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
+import { useAuth } from "../context/AuthContext";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -42,6 +43,8 @@ const SUGGESTIONS = [
   { label: "Budget & dates", prompt: "Help me weigh the dates and budget for this trip. Compare the trade-offs and tell me what details you need from me." },
 ] as const;
 
+/** How long a reply may take to start before the chat says the advisor is searching. */
+const SLOW_REPLY_MS = 8000;
 const FAILED_TEXT = "Tara could not finish a reply. Your message is kept here; try again.";
 
 /** The member's line as the conversation keeps it: the files by name (chatbot-be uploads.with_note). */
@@ -79,6 +82,7 @@ function timeOfDay(): string {
 }
 
 export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
+  const advisorName = useAuth().member?.advisorName?.trim() || null;
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [pending, setPending] = useState("");
   const [activity, setActivity] = useState<string | null>(null);
@@ -93,6 +97,14 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const seeded = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Shown under the thread while an advisor has the chat; gone once anyone replies.
+  // A reply that is slow to start: say the advisor is looking, not that nothing is happening.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!busy || pending) return;
+    const t = window.setTimeout(() => setSlow(true), SLOW_REPLY_MS);
+    return () => window.clearTimeout(t);
+  }, [busy, pending]);
   const [heldNote, setHeldNote] = useState<string | null>(null);
   useEffect(() => {
     if (heldNote && messages[messages.length - 1]?.role === "assistant") setHeldNote(null);
@@ -296,7 +308,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           )}
           <div className="tc-header__title">
             <span className="tc-title">
-              Tara <span className="tc-badge">AI</span>
+              {advisorName ?? "Tara"} <span className="tc-badge">{advisorName ? "Advisor" : "AI"}</span>
             </span>
             <div className="tc-status">
               <i aria-hidden="true" />
@@ -382,7 +394,16 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
               </p>
             )}
             {pending && <MessageBubble role="assistant" text={pending} streaming />}
-            {activity && <p className="tc-activity">{activity}</p>}
+            {activity ? (
+              <p className="tc-activity">{activity}</p>
+            ) : (
+              slow &&
+              !pending && (
+                <p className="tc-activity" role="status">
+                  {advisorName ? `${advisorName} is` : "Your advisor is"} searching for the best response…
+                </p>
+              )
+            )}
           </div>
         )}
 
