@@ -5,7 +5,7 @@ import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
-import { useAssistantName, useAuth } from "../context/AuthContext";
+import { capFirst, useAssistantName, useAuth } from "../context/AuthContext";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -198,7 +198,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
     const fail = (message?: string) =>
       setMessages((prev) => [
         ...prev.filter((m) => !m.failed),
-        { id: `f-${Date.now()}`, role: "assistant", text: message || failedText(assistant), at: Date.now(), failed: true },
+        { id: `f-${Date.now()}`, role: "assistant", text: message || failedText(capFirst(assistant)), at: Date.now(), failed: true },
       ]);
     try {
       await streamChat(text, chatId, (event) => {
@@ -309,7 +309,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           )}
           <div className="tc-header__title">
             <span className="tc-title">
-              {advisorName ?? "Tara"} <span className="tc-badge">{advisorName ? "Advisor" : "AI"}</span>
+              {capFirst(assistant)} <span className="tc-badge">Advisor</span>
             </span>
             <div className="tc-status">
               <i aria-hidden="true" />
@@ -370,7 +370,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
                 {firstOfRun && (
                   <p className="tc-label">
                     <Horizon />
-                    {assistant}
+                    {capFirst(assistant)}
                   </p>
                 )}
                 <MessageBubble role={m.role} text={m.text} failed={m.failed} />
@@ -391,7 +391,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             {messages[messages.length - 1]?.role !== "assistant" && (
               <p className="tc-label">
                 <Horizon />
-                {assistant}
+                {capFirst(assistant)}
               </p>
             )}
             {pending && <MessageBubble role="assistant" text={pending} streaming />}
