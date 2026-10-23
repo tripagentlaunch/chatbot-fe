@@ -64,9 +64,12 @@ export function useAuth(): AuthState {
   return ctx;
 }
 
-/** Who the member talks to: their advisor's name when they have one, otherwise Tara. */
+/** Who the member talks to: their advisor's name when they have one, otherwise "your advisor". */
 export function useAssistantName(): string {
-  return useAuth().member?.advisorName?.trim() || "Tara";
+  return useAuth().member?.advisorName?.trim() || "your advisor";
 }
+
+/** The name at the start of a sentence or as a label ("Your advisor"). */
+export const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export { ApiError };
