@@ -45,6 +45,23 @@ const SUGGESTIONS = [
 
 /** How long a reply may take to start before the chat says the advisor is searching. */
 const SLOW_REPLY_MS = 8000;
+
+// What the member sees while a tool runs (2026-10-26): what's happening in their words,
+// never the tool's internal name ("Using find_destination…" before).
+const ACTIVITY: Record<string, string> = {
+  find_destination: "Checking our guides…",
+  get_destination_guide: "Checking our guides…",
+  where_to_go_in: "Looking at where's best that month…",
+  visa_guide: "Checking visa guidance…",
+  web_search: "Researching…",
+  read_page: "Researching…",
+  search_hotel_rates: "Checking rates…",
+  search_travel_prices: "Checking rates…",
+  build_trip_plan: "Putting your itinerary together…",
+  build_comparison: "Putting your comparison together…",
+  get_plan: "Opening your trip…",
+  hand_to_advisor: "Passing this to your advisor…",
+};
 const failedText = (who: string) => `${who} could not finish a reply. Your message is kept here; try again.`;
 
 /** The member's line as the conversation keeps it: the files by name (chatbot-be uploads.with_note). */
@@ -79,6 +96,17 @@ const toMs = (at?: number) => (at ? (at < 1e12 ? at * 1000 : at) : Date.now());
 function timeOfDay(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** Tara is working on a reply: three dots in her bubble, as on WhatsApp. */
+function TypingDots({ who }: { who: string }) {
+  return (
+    <div className="tc-msg tc-msg--tara tc-typing" role="status" aria-label={`${who} is typing`}>
+      <span />
+      <span />
+      <span />
+    </div>
+  );
 }
 
 export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
@@ -205,7 +233,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
         if (event.type === "text") {
           setPending((prev) => prev + (event.delta as string));
         } else if (event.type === "tool") {
-          setActivity(`Using ${event.name as string}...`);
+          setActivity(ACTIVITY[event.name as string] ?? null);
         } else if (event.type === "done" && event.held) {
           // An advisor has taken this chat over: Tara stays quiet and the
           // advisor's reply arrives through the history poll (2026-10-22).
@@ -395,6 +423,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
               </p>
             )}
             {pending && <MessageBubble role="assistant" text={pending} streaming />}
+            {(!pending || activity) && <TypingDots who={capFirst(assistant)} />}
             {activity ? (
               <p className="tc-activity">{activity}</p>
             ) : (
