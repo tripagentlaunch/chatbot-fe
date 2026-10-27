@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, AuthProvider, useAuth } from "./context/AuthContext";
+import AuthScreen from "./design/AuthScreen";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import TripDetail from "./pages/TripDetail";
@@ -9,7 +10,7 @@ import Trips from "./pages/Trips";
 function Protected({ children }: { children: JSX.Element }) {
   const { member, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <p className="muted">Loading...</p>;
+  if (loading) return <AuthScreen><p className="tc-auth__status">Loading...</p></AuthScreen>;
   // Remember where they were headed (e.g. an itinerary link from WhatsApp).
   if (!member) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return children;
@@ -39,7 +40,7 @@ function CodeHandoff({ children }: { children: JSX.Element }) {
       )
       .finally(() => setWorking(false));
   }, [code, signIn, navigate]);
-  return working ? <p className="muted">Signing you in...</p> : children;
+  return working ? <AuthScreen><p className="tc-auth__status">Signing you in...</p></AuthScreen> : children;
 }
 
 export default function App() {
