@@ -1,5 +1,6 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useEffect, useRef, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { ApiError, AuthProvider, useAuth } from "./context/AuthContext";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import TripDetail from "./pages/TripDetail";
@@ -14,9 +15,37 @@ function Protected({ children }: { children: JSX.Element }) {
   return children;
 }
 
+/**
+ * One login with the customer site: a member signed in there opens Tara at /chat#code=XXXX
+ * and is signed in with the same code, without typing it (/login#code=XXXX still works). The
+ * code is read once and cleared from the address bar before anything else, then they land on
+ * /chat, so the link they see and share is just /chat. A code that is refused goes to the
+ * login page with the reason.
+ */
+function CodeHandoff({ children }: { children: JSX.Element }) {
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
+  const [code] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("code"));
+  const [working, setWorking] = useState(!!code);
+  const tried = useRef(false);
+  useEffect(() => {
+    if (!code || tried.current) return;
+    tried.current = true;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    signIn(code.replace(/\s+/g, "").toUpperCase())
+      .then(() => navigate("/chat", { replace: true }))
+      .catch((err) =>
+        navigate("/login", { replace: true, state: { error: err instanceof ApiError ? err.message : "Something went wrong." } }),
+      )
+      .finally(() => setWorking(false));
+  }, [code, signIn, navigate]);
+  return working ? <p className="muted">Signing you in...</p> : children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <CodeHandoff>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -49,6 +78,7 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/chat" replace />} />
       </Routes>
+      </CodeHandoff>
     </AuthProvider>
   );
 }
