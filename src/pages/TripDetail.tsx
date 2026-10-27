@@ -726,7 +726,7 @@ export default function TripDetail() {
     flushSync(() => setPrintAll(true));
     try {
       await photosReady(cardRef.current, hero);
-      if (cardRef.current) await downloadItineraryPdf(cardRef.current, plan.title);
+      if (cardRef.current) await downloadItineraryPdf(cardRef.current, plan.title, name ? `Made for ${name}` : "");
     } catch {
       window.print();   // the file couldn't be made here; the print dialog still saves a PDF
     } finally {
@@ -772,6 +772,13 @@ export default function TripDetail() {
 
   return (
     <div className="pv-page">
+      {making ? (
+        // Covers the page while every tab is laid out for the file, so it doesn't jump around.
+        <div className="pv-making" role="status" aria-live="polite">
+          <span className="pv-making-dot" />
+          Preparing your PDF…
+        </div>
+      ) : null}
       <div className="pv-shell">
         <div className="pv-card" ref={cardRef}>
           <div className="pv-hero" style={hero ? { backgroundImage: `url("${hero}")` } : undefined}>
