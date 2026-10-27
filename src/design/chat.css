@@ -273,6 +273,37 @@ html:has(.tc-root) body {
     opacity: 0;
   }
 }
+.tc-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  padding: 14px 16px;
+}
+.tc-typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tc-champagne);
+  opacity: 0.35;
+  animation: tc-typing 1.2s ease-in-out infinite;
+}
+.tc-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.tc-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes tc-typing {
+  0%, 60%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
 .tc-activity {
   margin: 0;
   color: var(--tc-ivory-3);
@@ -678,6 +709,10 @@ html:has(.tc-root) body {
 @media (prefers-reduced-motion: reduce) {
   .tc-caret::after {
     animation: none;
+  }
+  .tc-typing span {
+    animation: none;
+    opacity: 0.7;
   }
 }
 

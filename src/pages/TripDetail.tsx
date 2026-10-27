@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { downloadItineraryPdf } from "../lib/itineraryPdf";
 import "../design/itinerary.css";
 
 // The itinerary page, in the design of london-itinerary-preview.html (the
@@ -636,6 +637,7 @@ export default function TripDetail() {
   // The PDF is the whole itinerary (2026-10-22): every tab one after another,
   // every day, every photo, not just the tab on screen.
   const [printAll, setPrintAll] = useState(false);
+  const [making, setMaking] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const before = () => flushSync(() => setPrintAll(true));   // also for ⌘P / Ctrl+P
@@ -717,10 +719,20 @@ export default function TripDetail() {
   const name = member && member.name !== "Traveller" ? member.name : null;
   const madeFor = [name ? `Made for ${name}` : null, asof].filter(Boolean).join(" · ");
 
+  // A real .pdf file of the whole itinerary, not the print dialog (2026-10-22).
   const downloadPdf = async () => {
+    if (making) return;
+    setMaking(true);
     flushSync(() => setPrintAll(true));
-    await photosReady(cardRef.current, hero);
-    window.print();
+    try {
+      await photosReady(cardRef.current, hero);
+      if (cardRef.current) await downloadItineraryPdf(cardRef.current, plan.title);
+    } catch {
+      window.print();   // the file couldn't be made here; the print dialog still saves a PDF
+    } finally {
+      setPrintAll(false);
+      setMaking(false);
+    }
   };
 
   let content: ReactNode;
@@ -772,11 +784,11 @@ export default function TripDetail() {
                   </span>
                   {madeFor ? <span className="pv-madefor">{madeFor}</span> : null}
                 </div>
-                <button type="button" className="pv-dlbtn" onClick={downloadPdf}>
+                <button type="button" className="pv-dlbtn" onClick={downloadPdf} disabled={making} aria-busy={making}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Download PDF
+                  {making ? "Preparing PDF…" : "Download PDF"}
                 </button>
               </div>
               <h1 className="pv-title">{plan.title}</h1>

@@ -732,6 +732,25 @@
   text-align: right;
 }
 
+/* While the PDF file is drawn (lib/itineraryPdf.ts): the page as printed,
+   without buttons or tabs, nothing mid-animation. */
+.pv-pdf .pv-tabcontent,
+.pv-pdf * {
+  animation: none !important;
+  transition: none !important;
+}
+.pv-pdf .pv-dlbtn,
+.pv-pdf .pv-tabs,
+.pv-pdf .pv-subtabs-row,
+.pv-pdf .pv-cta,
+.pv-pdf .pv-swap-btn {
+  display: none !important;
+}
+.pv-dlbtn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
 @media print {
   @page {
     size: A4;

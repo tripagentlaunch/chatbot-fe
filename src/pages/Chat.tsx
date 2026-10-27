@@ -5,7 +5,7 @@ import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
-import { capFirst, useAssistantName, useAuth } from "../context/AuthContext";
+import { capFirst, useAssistantName } from "../context/AuthContext";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -43,8 +43,6 @@ const SUGGESTIONS = [
   { label: "Budget & dates", prompt: "Help me weigh the dates and budget for this trip. Compare the trade-offs and tell me what details you need from me." },
 ] as const;
 
-/** How long a reply may take to start before the chat says the advisor is searching. */
-const SLOW_REPLY_MS = 8000;
 const failedText = (who: string) => `${who} could not finish a reply. Your message is kept here; try again.`;
 
 /** The member's line as the conversation keeps it: the files by name (chatbot-be uploads.with_note). */
@@ -81,12 +79,21 @@ function timeOfDay(): string {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
+/** Tara is working on a reply: three dots in her bubble, as on WhatsApp. */
+function TypingDots({ who }: { who: string }) {
+  return (
+    <div className="tc-msg tc-msg--tara tc-typing" role="status" aria-label={`${who} is typing`}>
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
-  const advisorName = useAuth().member?.advisorName?.trim() || null;
   const assistant = useAssistantName();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [pending, setPending] = useState("");
-  const [activity, setActivity] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState("");
@@ -107,14 +114,6 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const seeded = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Shown under the thread while an advisor has the chat; gone once anyone replies.
-  // A reply that is slow to start: say the advisor is looking, not that nothing is happening.
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    setSlow(false);
-    if (!busy || pending) return;
-    const t = window.setTimeout(() => setSlow(true), SLOW_REPLY_MS);
-    return () => window.clearTimeout(t);
-  }, [busy, pending]);
   const [heldNote, setHeldNote] = useState<string | null>(null);
   useEffect(() => {
     if (heldNote && messages[messages.length - 1]?.role === "assistant") setHeldNote(null);
@@ -189,14 +188,13 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, pending, activity]);
+  }, [messages, pending]);
 
   /** `resend`: the member's line is already in the thread, so repeat the turn, not the bubble. */
   async function send(text: string, resend = false, files: ChatAttachment[] = []) {
     setBusy(true);
     busyRef.current = true;
     setPending("");
-    setActivity(null);
     lastSent.current = text;
     lastFiles.current = files;
     if (resend) {
@@ -213,15 +211,14 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       await streamChat(text, chatId, (event) => {
         if (event.type === "text") {
           setPending((prev) => prev + (event.delta as string));
-        } else if (event.type === "tool") {
-          setActivity(`Using ${event.name as string}...`);
         } else if (event.type === "done" && event.held) {
           // An advisor has taken this chat over: Tara stays quiet and the
           // advisor's reply arrives through the history poll (2026-10-22).
           setHeldNote(typeof event.note === "string" ? event.note : "Your advisor will reply here shortly.");
           serverLenRef.current += 1; // only the member's message was stored
           setPending("");
-          setActivity(null);
+          setBusy(false);
+          busyRef.current = false;
         } else if (event.type === "done") {
           const replies = (event.messages as string[]) ?? [];
           setMessages((prev) => [
@@ -233,7 +230,8 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
           // them so the poll doesn't re-append our own just-streamed reply.
           serverLenRef.current += 2;
           setPending("");
-          setActivity(null);
+          setBusy(false); // the reply is on screen: the dots go in the same moment
+          busyRef.current = false;
         } else if (event.type === "error") {
           fail();
         }
@@ -263,7 +261,6 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       setBusy(false);
       busyRef.current = false;
       setPending("");
-      setActivity(null);
     }
   }
 
@@ -403,17 +400,10 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
                 {capFirst(assistant)}
               </p>
             )}
-            {pending && <MessageBubble role="assistant" text={pending} streaming />}
-            {activity ? (
-              <p className="tc-activity">{activity}</p>
-            ) : (
-              slow &&
-              !pending && (
-                <p className="tc-activity" role="status">
-                  {advisorName ? `${advisorName} is` : "Your advisor is"} searching for the best response…
-                </p>
-              )
-            )}
+            {/* As on WhatsApp: the dots stay for the whole reply and the finished message(s)
+                appear together (from the "done" event), instead of the words being typed out
+                here as they stream in. `pending` still collects the stream but is not shown. */}
+            <TypingDots who={capFirst(assistant)} />
           </div>
         )}
 
