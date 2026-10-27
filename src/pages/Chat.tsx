@@ -90,6 +90,15 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [busy, setBusy] = useState(false);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState("");
+  // Tell the advisor's panel (three dots) that the member is typing: a ping at most every 2.5s while the box has text.
+  const lastTypingPing = useRef(0);
+  useEffect(() => {
+    if (!draft.trim()) return;
+    const now = Date.now();
+    if (now - lastTypingPing.current < 2500) return;
+    lastTypingPing.current = now;
+    api.post("/api/typing").catch(() => {});
+  }, [draft]);
   const [capped, setCapped] = useState<string | null>(null);
   const [agentNote, setAgentNote] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
