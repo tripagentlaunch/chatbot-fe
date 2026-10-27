@@ -422,8 +422,10 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
                 {capFirst(assistant)}
               </p>
             )}
-            {pending && <MessageBubble role="assistant" text={pending} streaming />}
-            {(!pending || activity) && <TypingDots who={capFirst(assistant)} />}
+            {/* As on WhatsApp: the dots stay for the whole reply and the finished message(s)
+                appear together (from the "done" event), instead of the words being typed out
+                here as they stream in. `pending` still collects the stream but is not shown. */}
+            <TypingDots who={capFirst(assistant)} />
             {activity ? (
               <p className="tc-activity">{activity}</p>
             ) : (
