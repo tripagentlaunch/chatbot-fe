@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, useAuth } from "../context/AuthContext";
+import AuthScreen from "../design/AuthScreen";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -49,9 +50,10 @@ export default function Login() {
   }
 
   return (
-    <div className="auth-screen">
-      <form className="auth-card" onSubmit={onSubmit}>
-        <h1>TripAgent</h1>
+    <AuthScreen>
+      <form className="tc-auth__card" onSubmit={onSubmit}>
+        <span className="tc-wordmark">TripAgent</span>
+        <h1>Welcome.</h1>
         <p>Enter your access code to continue.</p>
         <input
           autoFocus
@@ -60,11 +62,11 @@ export default function Login() {
           placeholder="AB1234CD"
           maxLength={40}
         />
-        {error && <p className="error">{error}</p>}
+        {error && <p className="tc-auth__error">{error}</p>}
         <button type="submit" disabled={busy || !code.trim()}>
           {busy ? "Signing in..." : "Continue"}
         </button>
       </form>
-    </div>
+    </AuthScreen>
   );
 }
