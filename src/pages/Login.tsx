@@ -9,7 +9,8 @@ export default function Login() {
   const from = (useLocation().state as { from?: string } | null)?.from;
   const next = from && from.startsWith("/trips/") ? from : "/chat";
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // A code the customer site handed over that was refused (see App.tsx CodeHandoff) arrives with its reason.
+  const [error, setError] = useState<string | null>((useLocation().state as { error?: string } | null)?.error ?? null);
   const [busy, setBusy] = useState(false);
 
   // One login with the customer site (2026-10-09): a member signed in there
