@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-const TOKEN_KEY = "tripagent.token";
+export const TOKEN_KEY = "tripagent.token";
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);

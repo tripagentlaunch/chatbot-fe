@@ -57,7 +57,7 @@ export default function TopNav() {
                 {name ?? "Signed in"}
                 <span>{member.code}</span>
               </p>
-              <button type="button" role="menuitem" className="tc-menu__item" onClick={signOut}>
+              <button type="button" role="menuitem" className="tc-menu__item" onClick={() => signOut({ forget: true })}>
                 Sign out
               </button>
             </div>
