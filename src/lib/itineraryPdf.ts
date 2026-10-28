@@ -35,6 +35,30 @@ const RULE = "#e4ddcf";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// A phone lays the page out ~390px wide; drawn onto A4 that came out about 2.3x
+// too big (a 3-page trip became 13-18 pages). While the file is drawn the page is
+// laid out at desktop width instead (the "Preparing your PDF" cover hides it), so
+// a phone makes the same PDF as a computer.
+const PDF_LAYOUT_W = 1000;
+async function desktopLayout(): Promise<() => void> {
+  if (window.innerWidth >= 820) return () => undefined;
+  let meta = document.querySelector<HTMLMetaElement>("meta[name='viewport']");
+  const added = !meta;
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "viewport";
+    document.head.appendChild(meta);
+  }
+  const before = meta.getAttribute("content");
+  meta.setAttribute("content", `width=${PDF_LAYOUT_W}`);
+  for (let i = 0; i < 30 && window.innerWidth < 820; i++) await sleep(50);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return () => {
+    if (added) meta!.remove();
+    else if (before != null) meta!.setAttribute("content", before);
+  };
+}
+
 function readable(url: string): string {
   if (url.startsWith("data:") || url.startsWith(BASE_URL) || url.startsWith(window.location.origin)) return url;
   return `${BASE_URL}/api/photo/remote?url=${encodeURIComponent(url)}`;
@@ -237,6 +261,7 @@ function brandPages(pdf: Pdf, fonts: { serif: string; sans: string }, title: str
 
 export async function downloadItineraryPdf(card: HTMLElement, title: string, madeFor = ""): Promise<void> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
+  const restoreLayout = await desktopLayout();
   card.classList.add("pv-pdf");
   const folded = Array.from(card.querySelectorAll("details")).filter((d) => !d.open);
   folded.forEach((d) => { d.open = true; });
@@ -266,7 +291,10 @@ export async function downloadItineraryPdf(card: HTMLElement, title: string, mad
     for (const part of parts) {
       const rect = part.getBoundingClientRect();
       const scale = Math.min(2, Math.sqrt(MAX_PIXELS / Math.max(1, rect.width * rect.height)));
-      const canvas = await html2canvas(part, { scale, useCORS: true, backgroundColor: background, logging: false, onclone });
+      const canvas = await html2canvas(part, {
+        scale, useCORS: true, backgroundColor: background, logging: false, onclone,
+        windowWidth: window.innerWidth, windowHeight: window.innerHeight,
+      });
       const pxScale = canvas.height / rect.height;
       const cuts = cutPoints(part);
       const left = (rect.left - card.getBoundingClientRect().left) * mmPerPx;
@@ -298,5 +326,6 @@ export async function downloadItineraryPdf(card: HTMLElement, title: string, mad
     restore();
     folded.forEach((d) => { d.open = false; });
     card.classList.remove("pv-pdf");
+    restoreLayout();
   }
 }
