@@ -97,6 +97,15 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [busy, setBusy] = useState(false);
   const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [draft, setDraft] = useState("");
+  // Tell the advisor's panel the member has the chat open (online, then "last seen"): a heartbeat every 30s
+  // while the tab is visible, and straight away when it is opened or comes back to the front.
+  useEffect(() => {
+    const beat = () => { if (!document.hidden) api.post("/api/presence").catch(() => {}); };
+    beat();
+    const t = setInterval(beat, 30000);
+    document.addEventListener("visibilitychange", beat);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", beat); };
+  }, []);
   // Tell the advisor's panel (three dots) that the member is typing: a ping at most every 2.5s while the box has text.
   const lastTypingPing = useRef(0);
   useEffect(() => {
