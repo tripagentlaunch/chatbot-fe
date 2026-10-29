@@ -792,3 +792,174 @@ html:has(.tc-root) body {
 .tc-auth__card .tc-auth__error {
   color: #f1a29a;
 }
+
+
+/* The rich card for an itinerary proposal link in Tara's reply (components/ItineraryCard.tsx):
+   a photo, the trip's name and nights, and an arrow. No outline. */
+.tc-rich {
+  display: block;
+  width: min(440px, 92%); /* back to the earlier size (it was briefly min(580px, 100%)) */
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 28px;
+  background: #151515;
+  color: var(--tc-ivory);
+  text-decoration: none;
+  transition: transform 0.35s cubic-bezier(0.19, 1, 0.22, 1);
+}
+.tc-rich:hover {
+  transform: translateY(-2px);
+}
+.tc-rich:focus-visible {
+  outline: 2px solid var(--tc-champagne);
+  outline-offset: 3px;
+}
+.tc-rich__photo {
+  position: relative;
+  aspect-ratio: 16 / 9; /* shorter again: was 3 / 2, then 4 / 3, and 19 / 10 at first. The card hugs its content, so it shrinks with this. */
+  overflow: hidden;
+  border-radius: 24px; /* all four corners, bottom ones included */
+  isolation: isolate; /* keeps the rounded clip on the picture's bottom corners in Safari too */
+  transform: translateZ(0);
+  background: linear-gradient(135deg, #3a3a40 0%, #1c1c20 100%);
+}
+.tc-rich__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 24px; /* the picture itself is rounded at every corner too */
+}
+.tc-rich__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px 8px 18px; /* a shorter text area: was 10px 12px 10px 20px, and 18px 18px 18px 20px before that */
+}
+.tc-rich__text {
+  min-width: 0;
+}
+.tc-rich__title {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--tc-ivory);
+  overflow-wrap: anywhere;
+}
+.tc-rich__meta {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--tc-ivory-2);
+}
+.tc-rich__go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  height: 48px; /* was 52px */
+  min-width: 48px;
+  box-sizing: border-box;
+  padding: 0 13px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: background 0.3s ease, padding 0.45s cubic-bezier(0.19, 1, 0.22, 1), gap 0.45s cubic-bezier(0.19, 1, 0.22, 1);
+}
+/* "View itinerary" opens beside the arrow on hover or keyboard focus (the arrow alone otherwise, as in the reference). */
+.tc-rich__golabel {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 14px;
+  opacity: 0;
+  transition: max-width 0.45s cubic-bezier(0.19, 1, 0.22, 1), opacity 0.3s ease;
+}
+.tc-rich:hover .tc-rich__go,
+.tc-rich:focus-visible .tc-rich__go {
+  padding: 0 18px 0 20px;
+  gap: 8px;
+}
+.tc-rich:hover .tc-rich__golabel,
+.tc-rich:focus-visible .tc-rich__golabel {
+  max-width: 9em;
+  opacity: 1;
+}
+.tc-rich:hover .tc-rich__go {
+  background: rgba(255, 255, 255, 0.18);
+}
+.tc-rich--loading .tc-rich__photo {
+  animation: tc-rich-pulse 1.4s ease-in-out infinite;
+}
+@keyframes tc-rich-pulse {
+  50% {
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-rich,
+  .tc-rich__go {
+    transition: none;
+  }
+  .tc-rich--loading .tc-rich__photo {
+    animation: none;
+  }
+}
+
+/* Dates and nights sit on the meta line; the places and the status come with them. */
+.tc-rich__places {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--tc-ivory-3);
+}
+.tc-rich__status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 3px 11px 3px 9px;
+  border-radius: 999px;
+  background: rgba(10, 10, 11, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--tc-ivory);
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+}
+.tc-rich__status::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--tc-champagne);
+  vertical-align: 1px;
+}
+.tc-rich__status--requested::before {
+  background: var(--tc-amber);
+}
+.tc-rich__status--booked::before {
+  background: #8fd19e;
+}
+.tc-rich__status--travelling::before {
+  background: #8ab4f8;
+}
+.tc-rich__status--completed::before {
+  background: var(--tc-ivory-3);
+}
+.tc-rich__status--cancelled::before {
+  background: #e58f8f;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-rich__go,
+  .tc-rich__golabel {
+    transition: none;
+  }
+}
