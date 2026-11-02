@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import ItineraryCard from "./ItineraryCard";
 
 // Upstream (chatbot-fe/dev): a div with role classes, and a link when the whole message is a URL.
 // Ours: the same, wearing the Tara design (white for the member, frosted glass for Tara).
@@ -44,7 +45,55 @@ function linkify(text: string): ReactNode[] {
   return out;
 }
 
+// An itinerary proposal link: .../trips/<key>. In a finished reply from Tara it becomes a rich card
+// (ItineraryCard), shown under the sentence it came in, instead of a bare URL.
+const TRIP_PATH_RE = /^\/trips\/([A-Za-z0-9_-]+)\/?$/;
+
+function tripKeyOf(href: string): string | null {
+  try {
+    return TRIP_PATH_RE.exec(new URL(href).pathname)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The message without its itinerary links, and the trip keys those links pointed at (in order, once each). */
+function pullItineraryLinks(text: string): { rest: string; keys: string[] } {
+  const keys: string[] = [];
+  let rest = "";
+  let last = 0;
+  for (const m of text.matchAll(LINK_RE)) {
+    const start = m.index ?? 0;
+    let href = m[2] ?? m[3];
+    let tail = "";
+    if (!m[2]) {
+      tail = href.match(TRAILING_RE)?.[0] ?? "";
+      href = href.slice(0, href.length - tail.length);
+    }
+    const key = tripKeyOf(href);
+    if (!key) continue;
+    if (!keys.includes(key)) keys.push(key);
+    rest += text.slice(last, start) + tail;
+    last = start + m[0].length;
+  }
+  rest += text.slice(last);
+  return { rest: rest.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(), keys };
+}
+
 export default function MessageBubble({ role, text, failed, streaming }: Props) {
+  if (role === "assistant" && !streaming && !failed) {
+    const { rest, keys } = pullItineraryLinks(text);
+    if (keys.length) {
+      return (
+        <>
+          {rest && <div className="tc-msg tc-msg--tara">{linkify(rest)}</div>}
+          {keys.map((k) => (
+            <ItineraryCard key={k} tripKey={k} />
+          ))}
+        </>
+      );
+    }
+  }
   const cls = [
     "tc-msg",
     role === "user" ? "tc-msg--member" : "tc-msg--tara",
