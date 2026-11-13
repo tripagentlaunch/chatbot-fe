@@ -56,6 +56,9 @@ interface Choice {
   price: string;
   /** TripAgent's own live price for this exact flight / room, when the server could price it. */
   live?: LivePrice;
+  /** Why this one was recommended, and what to weigh against it, in plain words. */
+  why?: string;
+  tradeoff?: string;
   source?: string;
   photo?: Photo;
   photos?: Photo[];
@@ -239,6 +242,21 @@ function OptionName({ c, block }: { c: Choice; block?: boolean }) {
   );
 }
 
+function WhyThis({ c }: { c: Choice }) {
+  if (!c.why && !c.tradeoff) return null;
+  return (
+    <div className="pv-option-detail" style={{ marginTop: 10 }}>
+      {c.why ? (
+        <div>
+          <strong>Why this one: </strong>
+          {c.why}
+        </div>
+      ) : null}
+      {c.tradeoff ? <div style={{ opacity: 0.75, marginTop: 4 }}>{c.tradeoff}</div> : null}
+    </div>
+  );
+}
+
 function FlightRow({ c, badge }: { c: Choice; badge: string }) {
   const f = c.flight;
   return (
@@ -264,6 +282,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
           </div>
         </div>
       ) : null}
+      <WhyThis c={c} />
       <div className="pv-recflight-foot">
         <span>{c.details}</span>
         <span className="pv-option-price">{c.price}</span>
@@ -287,6 +306,7 @@ function StayCard({ c, badge }: { c: Choice; badge: string }) {
         <div className="pv-option-detail" style={{ marginTop: 8 }}>
           {c.details}
         </div>
+        <WhyThis c={c} />
         <div className="pv-option-price pv-option-price--hotel" style={{ marginTop: 10 }}>
           {c.price}
         </div>
