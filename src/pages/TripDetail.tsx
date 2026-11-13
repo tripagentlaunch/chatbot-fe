@@ -41,6 +41,26 @@ interface FlightLeg {
   duration?: string;
   cabin?: string;
 }
+interface CityPick {
+  name: string;
+  area?: string;
+  tier?: string;
+  credentials?: string[];
+  description?: string;
+}
+/** The website's city page for a place on the trip: where to base yourself, stay, eat and what to do. */
+interface CityGuide {
+  slug: string;
+  name: string;
+  country?: string;
+  url: string;
+  tagline?: string;
+  base?: { name: string; description?: string }[];
+  stay?: CityPick[];
+  eat?: CityPick[];
+  do?: CityPick[];
+  party?: CityPick[];
+}
 interface Photo {
   url: string;
 }
@@ -82,6 +102,7 @@ interface TripPlan {
   shapeNote?: Note;
   stay: Row[];
   hotelOptions?: ChoiceGroup[];
+  cityGuides?: CityGuide[];
   move: Row[];
   flightOptions?: ChoiceGroup[];
   allowance: KV[];
@@ -526,6 +547,63 @@ function otherCosts(rows: KV[], groups: ChoiceGroup[]): KV[] {
   return rest.length ? rest : [];
 }
 
+function PickList({ title, picks }: { title: string; picks?: CityPick[] }) {
+  if (!picks || !picks.length) return null;
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div className="pv-recgroup-eyebrow" style={{ marginBottom: 10 }}>
+        {title}
+      </div>
+      <div style={{ display: "grid", gap: 12 }}>
+        {picks.map((p, i) => (
+          <div key={i} className="pv-option" style={{ display: "block" }}>
+            <div>
+              <strong>{p.name}</strong>
+              {p.area ? <span style={{ opacity: 0.7 }}>{` · ${p.area}`}</span> : null}
+              {p.tier ? <span style={{ opacity: 0.7, marginLeft: 8, fontSize: "0.85em", textTransform: "uppercase", letterSpacing: "0.06em" }}>{p.tier}</span> : null}
+            </div>
+            {p.credentials && p.credentials.length ? (
+              <div style={{ opacity: 0.75, fontSize: "0.9em", marginTop: 2 }}>{p.credentials.join(" · ")}</div>
+            ) : null}
+            {p.description ? <div className="pv-option-detail" style={{ marginTop: 6 }}>{p.description}</div> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** For each city on the trip, what its page on our website says: where to base yourself, stay, eat, do and go out. */
+function CityGuides({ guides }: { guides?: CityGuide[] }) {
+  if (!guides || !guides.length) return null;
+  return (
+    <>
+      <h2 className="pv-section-title">Where to eat and what to do</h2>
+      {guides.map((g) => (
+        <div key={g.slug} className="pv-recgroup" style={{ marginBottom: 28 }}>
+          <div className="pv-recgroup-head">
+            <span className="pv-recgroup-title">{g.name}</span>
+            <a className="pv-recgroup-sub" href={g.url} target="_blank" rel="noopener noreferrer">
+              {`Our full ${g.name} guide`}
+            </a>
+          </div>
+          {g.tagline ? <div className="pv-option-detail">{g.tagline}</div> : null}
+          {g.base && g.base.length ? (
+            <div className="pv-option-detail" style={{ marginTop: 8 }}>
+              <strong>Where to base yourself: </strong>
+              {g.base.map((b) => (b.description ? `${b.name} (${b.description})` : b.name)).join(" · ")}
+            </div>
+          ) : null}
+          <PickList title="Where we would stay" picks={g.stay} />
+          <PickList title="Where to eat" picks={g.eat} />
+          <PickList title="What to do" picks={g.do} />
+          <PickList title="After dark" picks={g.party} />
+        </div>
+      ))}
+    </>
+  );
+}
+
 function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
   const flights = plan.flightOptions || [];
   const hotels = plan.hotelOptions || [];
@@ -544,6 +622,8 @@ function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
 
       {hotels.length || plan.stay.length ? <h2 className="pv-section-title">Where you stay</h2> : null}
       {hotels.length ? hotels.map((g, i) => <ChoiceGroupView key={i} group={g} hotel gid={`stay-${i}`} />) : <RowList rows={plan.stay} />}
+
+      <CityGuides guides={plan.cityGuides} />
 
       {flights.length || hotels.length || plan.allowance.length ? <h2 className="pv-section-title">What it costs</h2> : null}
       <SelectionCosts flights={flights} hotels={hotels} />
