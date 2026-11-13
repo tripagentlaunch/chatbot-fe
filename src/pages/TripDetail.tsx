@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
@@ -41,44 +41,13 @@ interface FlightLeg {
   duration?: string;
   cabin?: string;
 }
-interface CityPick {
-  name: string;
-  area?: string;
-  tier?: string;
-  credentials?: string[];
-  description?: string;
-}
-/** The website's city page for a place on the trip: where to base yourself, stay, eat and what to do. */
-interface CityGuide {
-  slug: string;
-  name: string;
-  country?: string;
-  url: string;
-  tagline?: string;
-  base?: { name: string; description?: string }[];
-  stay?: CityPick[];
-  eat?: CityPick[];
-  do?: CityPick[];
-  party?: CityPick[];
-}
 interface Photo {
   url: string;
-}
-interface LivePrice {
-  amount: number;
-  currency?: string;
-  basis?: string;
-  checkedAt?: string;
 }
 interface Choice {
   name: string;
   details: string;
   price: string;
-  /** TripAgent's own live price for this exact flight / room, when the server could price it. */
-  live?: LivePrice;
-  /** Why this one was recommended, and what to weigh against it, in plain words. */
-  why?: string;
-  tradeoff?: string;
   source?: string;
   photo?: Photo;
   photos?: Photo[];
@@ -87,7 +56,6 @@ interface Choice {
 interface ChoiceGroup {
   label: string;
   rateSearch?: { checkIn: string; checkOut: string };
-  flightSearch?: { adults?: number; children?: number; infants?: number };
   recommended: Choice;
   alternatives: Choice[];
 }
@@ -102,7 +70,6 @@ interface TripPlan {
   shapeNote?: Note;
   stay: Row[];
   hotelOptions?: ChoiceGroup[];
-  cityGuides?: CityGuide[];
   move: Row[];
   flightOptions?: ChoiceGroup[];
   allowance: KV[];
@@ -139,8 +106,6 @@ interface Comparison {
 interface PlanResponse {
   plan: TripPlan | Comparison;
   status: string;
-  /** What the customer picked last time: group id ("flight-0", "stay-0") -> option index (0 = our choice). */
-  choices?: Record<string, number>;
 }
 
 function useIsMobile(): boolean {
@@ -156,38 +121,6 @@ function useIsMobile(): boolean {
 
 function photoOf(c: Choice): string | undefined {
   return c.photo?.url || c.photos?.[0]?.url;
-}
-
-// Photos Tara's plan came without (and the server could not attach when the page was first opened): looked up here, once per
-// name, from the server's place-photo lookup, and shown in the same cards, hero and PDF as the saved ones.
-const PhotoFallback = createContext<Record<string, string>>({});
-const HERO_KEY = "__hero";
-function useChoicePhoto(c: Choice): string | undefined {
-  const extra = useContext(PhotoFallback);
-  return photoOf(c) || extra[c.name];
-}
-
-/** "2026-12-22T08:50" / "2026-12-22 08:50:00" -> "08:50"; anything already a clock time is left as it is. */
-function clock(v: string | undefined): string {
-  if (!v) return "TBC";
-  const m = /(?:T|\s)(\d{1,2}:\d{2})/.exec(v);
-  return m ? m[1].padStart(5, "0") : v;
-}
-
-const photoMemo = new Map<string, Promise<string | null>>();
-function lookupPhoto(q: string, name?: string): Promise<string | null> {
-  const k = q + "|" + (name || "");
-  let hit = photoMemo.get(k);
-  if (!hit) {
-    hit = api
-      .get<{ photo?: { url?: string } | null; photos?: { url?: string }[] }>(
-        `/api/place-photo?q=${encodeURIComponent(q)}${name ? `&name=${encodeURIComponent(name)}` : ""}&w=1200`,
-      )
-      .then((r) => r.photo?.url || r.photos?.[0]?.url || null)
-      .catch(() => null);
-    photoMemo.set(k, hit);
-  }
-  return hit;
 }
 
 function hideBrokenImage(e: React.SyntheticEvent<HTMLImageElement>) {
@@ -263,21 +196,6 @@ function OptionName({ c, block }: { c: Choice; block?: boolean }) {
   );
 }
 
-function WhyThis({ c }: { c: Choice }) {
-  if (!c.why && !c.tradeoff) return null;
-  return (
-    <div className="pv-option-detail" style={{ marginTop: 10 }}>
-      {c.why ? (
-        <div>
-          <strong>Why this one: </strong>
-          {c.why}
-        </div>
-      ) : null}
-      {c.tradeoff ? <div style={{ opacity: 0.75, marginTop: 4 }}>{c.tradeoff}</div> : null}
-    </div>
-  );
-}
-
 function FlightRow({ c, badge }: { c: Choice; badge: string }) {
   const f = c.flight;
   return (
@@ -289,7 +207,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
       {f ? (
         <div className="pv-recflight-row">
           <div>
-            <div className="pv-recflight-time">{clock(f.depTime)}</div>
+            <div className="pv-recflight-time">{f.depTime || "TBC"}</div>
             <div className="pv-recflight-city">{f.depCity}</div>
           </div>
           <div className="pv-recflight-mid">
@@ -298,12 +216,11 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
             <div className="pv-recflight-sub">{[f.duration, f.cabin].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="pv-recflight-time">{clock(f.arrTime)}</div>
+            <div className="pv-recflight-time">{f.arrTime || "TBC"}</div>
             <div className="pv-recflight-city">{f.arrCity}</div>
           </div>
         </div>
       ) : null}
-      <WhyThis c={c} />
       <div className="pv-recflight-foot">
         <span>{c.details}</span>
         <span className="pv-option-price">{c.price}</span>
@@ -313,7 +230,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
 }
 
 function StayCard({ c, badge }: { c: Choice; badge: string }) {
-  const img = useChoicePhoto(c);
+  const img = photoOf(c);
   return (
     <div className="pv-recstay-stacked">
       <div className="pv-recstay-stacked-media">
@@ -327,7 +244,6 @@ function StayCard({ c, badge }: { c: Choice; badge: string }) {
         <div className="pv-option-detail" style={{ marginTop: 8 }}>
           {c.details}
         </div>
-        <WhyThis c={c} />
         <div className="pv-option-price pv-option-price--hotel" style={{ marginTop: 10 }}>
           {c.price}
         </div>
@@ -337,8 +253,7 @@ function StayCard({ c, badge }: { c: Choice; badge: string }) {
 }
 
 function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: () => void }) {
-  const found = useChoicePhoto(c);
-  const img = hotel ? found : undefined;
+  const img = hotel ? photoOf(c) : undefined;
   return (
     <div className="pv-option">
       {img ? <img className="pv-option-thumb" src={img} alt="" onError={hideBrokenImage} /> : null}
@@ -346,7 +261,7 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
         <OptionName c={c} block />
         {c.flight ? (
           <div className="pv-option-timing">
-            {clock(c.flight.depTime)} – {clock(c.flight.arrTime)}
+            {c.flight.depTime || "TBC"} – {c.flight.arrTime || "TBC"}
           </div>
         ) : null}
         <div className="pv-option-detail">{c.details}</div>
@@ -361,66 +276,10 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
   );
 }
 
-// What is picked in each flight / stay group, held by the page so everything that shows a price follows it. Group ids are the
-// trip calendar's ("flight-0", "stay-0"); a comparison's groups are prefixed with the option's name and are not saved.
-interface Selection {
-  picks: Record<string, number>;
-  pick: (gid: string, index: number) => void;
-}
-const SelectionContext = createContext<Selection>({ picks: {}, pick: () => undefined });
-
-function money(n: number, currency = "INR"): string {
-  const cur = currency.toUpperCase();
-  const v = Math.round(n);
-  return cur === "INR" ? "₹" + v.toLocaleString("en-IN") : `${cur} ${v.toLocaleString("en-US")}`;
-}
-
-function chosenOf(g: ChoiceGroup, picks: Record<string, number>, gid: string): Choice {
-  const options = [g.recommended, ...(g.alternatives || [])];
-  return options[picks[gid] || 0] || g.recommended;
-}
-
-/** What the customer's picks cost, from each picked choice's live price: one row per flight / stay, the total of the priced ones,
- *  and what is still for the advisor to price. Follows Swap at once. */
-function SelectionCosts({ flights, hotels, prefix = "" }: { flights: ChoiceGroup[]; hotels: ChoiceGroup[]; prefix?: string }) {
-  const { picks } = useContext(SelectionContext);
-  const rows: { k: string; c: Choice }[] = [
-    ...flights.map((g, i) => ({ k: g.recommended.flight ? `${g.recommended.flight.depCity} → ${g.recommended.flight.arrCity}` : g.label, c: chosenOf(g, picks, `${prefix}flight-${i}`) })),
-    ...hotels.map((g, i) => ({ k: g.label, c: chosenOf(g, picks, `${prefix}stay-${i}`) })),
-  ];
-  if (!rows.length) return null;
-  const priced = rows.filter((r) => r.c.live && r.c.live.amount > 0);
-  const currencies = new Set(priced.map((r) => (r.c.live!.currency || "INR").toUpperCase()));
-  const total = priced.reduce((n, r) => n + r.c.live!.amount, 0);
-  const cur = currencies.size === 1 ? Array.from(currencies)[0] : "INR";
-  const open = rows.length - priced.length;
-  const party = [...flights, ...hotels].map((g) => g.flightSearch).find(Boolean);
-  const travellers = party ? (party.adults || 0) + (party.children || 0) : 0;
-  const stamps = priced.map((r) => r.c.live!.checkedAt).filter((x): x is string => !!x).sort();
-  const checked = stamps.length ? new Date(stamps[0]) : null;
-  const kv: KV[] = rows.map((r) => ({ k: `${r.k} · ${r.c.name}`, v: r.c.live && r.c.live.amount > 0 ? money(r.c.live.amount, r.c.live.currency) : "Your advisor confirms the price" }));
-  if (priced.length && currencies.size === 1) {
-    kv.push({ k: open ? "Total of the priced choices" : "Your total", v: money(total, cur) });
-  }
-  return (
-    <>
-      <CostTable rows={kv} />
-      <div className="pv-option-detail" style={{ marginTop: 8 }}>
-        {priced.length && currencies.size === 1 && travellers > 1 ? `About ${money(total / travellers, cur)} per traveller. ` : ""}
-        {open ? `${open} choice${open === 1 ? " is" : "s are"} not priced yet, so your advisor will confirm ${open === 1 ? "it" : "them"}. ` : ""}
-        {checked && !isNaN(checked.getTime()) ? `Live prices checked ${checked.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. ` : ""}
-        This follows what you pick above.
-      </div>
-    </>
-  );
-}
-
 /** "Our choice" plus its alternatives, with Swap — the template's recommendation group. */
-function ChoiceGroupView({ group, hotel, gid }: { group: ChoiceGroup; hotel: boolean; gid: string }) {
+function ChoiceGroupView({ group, hotel }: { group: ChoiceGroup; hotel: boolean }) {
   const mobile = useIsMobile();
-  const { picks, pick } = useContext(SelectionContext);
-  const selected = picks[gid] || 0;
-  const setSelected = (i: number) => pick(gid, i);
+  const [selected, setSelected] = useState(0);
   const options = [group.recommended, ...(group.alternatives || [])];
   const chosen = options[selected] || group.recommended;
   const badge = selected === 0 ? "Our choice" : "Selected";
@@ -516,7 +375,6 @@ function DefList({ rows }: { rows: KV[] }) {
 }
 
 function CostTable({ rows }: { rows: KV[] }) {
-  if (!rows.length) return null;
   return (
     <div className="pv-costtable">
       {rows.map((r, i) => (
@@ -538,72 +396,6 @@ function Callout({ note }: { note: Note }) {
   );
 }
 
-/** The plan's written cost lines. Once the flights and stays are priced above from the picks, the lines that repeat them (flights, hotels,
- *  trip total) are dropped so the page never shows two different totals; with nothing priced the written lines stay as they were. */
-function otherCosts(rows: KV[], groups: ChoiceGroup[]): KV[] {
-  const anyLive = groups.some((g) => [g.recommended, ...(g.alternatives || [])].some((c) => c.live && c.live.amount > 0));
-  if (!anyLive) return rows;
-  const rest = rows.filter((r) => !/flight|fare|airfare|hotel|stay|accommodation|room|total|trip cost/i.test(r.k));
-  return rest.length ? rest : [];
-}
-
-function PickList({ title, picks }: { title: string; picks?: CityPick[] }) {
-  if (!picks || !picks.length) return null;
-  return (
-    <div style={{ marginTop: 18 }}>
-      <div className="pv-recgroup-eyebrow" style={{ marginBottom: 10 }}>
-        {title}
-      </div>
-      <div style={{ display: "grid", gap: 12 }}>
-        {picks.map((p, i) => (
-          <div key={i} className="pv-option" style={{ display: "block" }}>
-            <div>
-              <strong>{p.name}</strong>
-              {p.area ? <span style={{ opacity: 0.7 }}>{` · ${p.area}`}</span> : null}
-              {p.tier ? <span style={{ opacity: 0.7, marginLeft: 8, fontSize: "0.85em", textTransform: "uppercase", letterSpacing: "0.06em" }}>{p.tier}</span> : null}
-            </div>
-            {p.credentials && p.credentials.length ? (
-              <div style={{ opacity: 0.75, fontSize: "0.9em", marginTop: 2 }}>{p.credentials.join(" · ")}</div>
-            ) : null}
-            {p.description ? <div className="pv-option-detail" style={{ marginTop: 6 }}>{p.description}</div> : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** For each city on the trip, what its page on our website says: where to base yourself, stay, eat, do and go out. */
-function CityGuides({ guides }: { guides?: CityGuide[] }) {
-  if (!guides || !guides.length) return null;
-  return (
-    <>
-      <h2 className="pv-section-title">Where to eat and what to do</h2>
-      {guides.map((g) => (
-        <div key={g.slug} className="pv-recgroup" style={{ marginBottom: 28 }}>
-          <div className="pv-recgroup-head">
-            <span className="pv-recgroup-title">{g.name}</span>
-            <a className="pv-recgroup-sub" href={g.url} target="_blank" rel="noopener noreferrer">
-              {`Our full ${g.name} guide`}
-            </a>
-          </div>
-          {g.tagline ? <div className="pv-option-detail">{g.tagline}</div> : null}
-          {g.base && g.base.length ? (
-            <div className="pv-option-detail" style={{ marginTop: 8 }}>
-              <strong>Where to base yourself: </strong>
-              {g.base.map((b) => (b.description ? `${b.name} (${b.description})` : b.name)).join(" · ")}
-            </div>
-          ) : null}
-          <PickList title="Where we would stay" picks={g.stay} />
-          <PickList title="Where to eat" picks={g.eat} />
-          <PickList title="What to do" picks={g.do} />
-          <PickList title="After dark" picks={g.party} />
-        </div>
-      ))}
-    </>
-  );
-}
-
 function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
   const flights = plan.flightOptions || [];
   const hotels = plan.hotelOptions || [];
@@ -618,19 +410,15 @@ function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
       ) : null}
 
       {flights.length || plan.move.length ? <h2 className="pv-section-title">Getting there</h2> : null}
-      {flights.length ? flights.map((g, i) => <ChoiceGroupView key={i} group={g} hotel={false} gid={`flight-${i}`} />) : <RowList rows={plan.move} />}
+      {flights.length ? flights.map((g, i) => <ChoiceGroupView key={i} group={g} hotel={false} />) : <RowList rows={plan.move} />}
 
       {hotels.length || plan.stay.length ? <h2 className="pv-section-title">Where you stay</h2> : null}
-      {hotels.length ? hotels.map((g, i) => <ChoiceGroupView key={i} group={g} hotel gid={`stay-${i}`} />) : <RowList rows={plan.stay} />}
+      {hotels.length ? hotels.map((g, i) => <ChoiceGroupView key={i} group={g} hotel />) : <RowList rows={plan.stay} />}
 
-      <CityGuides guides={plan.cityGuides} />
-
-      {flights.length || hotels.length || plan.allowance.length ? <h2 className="pv-section-title">What it costs</h2> : null}
-      <SelectionCosts flights={flights} hotels={hotels} />
       {plan.allowance.length ? (
         <>
-          {flights.length || hotels.length ? <div style={{ height: 14 }} /> : null}
-          <CostTable rows={otherCosts(plan.allowance, [...flights, ...hotels])} />
+          <h2 className="pv-section-title">What it costs</h2>
+          <CostTable rows={plan.allowance} />
         </>
       ) : null}
 
@@ -789,7 +577,7 @@ function OptionTab({ o }: { o: Option }) {
         <>
           <h2 className="pv-section-title">Getting there</h2>
           {o.flightOptions.map((g, i) => (
-            <ChoiceGroupView key={i} group={g} hotel={false} gid={`${o.name}|flight-${i}`} />
+            <ChoiceGroupView key={i} group={g} hotel={false} />
           ))}
         </>
       ) : null}
@@ -797,13 +585,12 @@ function OptionTab({ o }: { o: Option }) {
         <>
           <h2 className="pv-section-title">Where you stay</h2>
           {o.hotelOptions.map((g, i) => (
-            <ChoiceGroupView key={i} group={g} hotel gid={`${o.name}|stay-${i}`} />
+            <ChoiceGroupView key={i} group={g} hotel />
           ))}
         </>
       ) : null}
       <h2 className="pv-section-title">What it costs</h2>
-      {o.flightOptions?.length || o.hotelOptions?.length ? <SelectionCosts flights={o.flightOptions || []} hotels={o.hotelOptions || []} prefix={`${o.name}|`} /> : null}
-      <CostTable rows={[{ k: "Trip total (indicative)", v: o.allin || o.price }]} />
+      <CostTable rows={[{ k: "Trip total", v: o.allin || o.price }]} />
       {o.tradeoffs?.length || o.catch ? (
         <>
           <h2 className="pv-section-title">Worth knowing</h2>
@@ -830,16 +617,13 @@ function photosReady(root: HTMLElement | null, hero: string | undefined, maxMs =
   return Promise.race([Promise.all(waits).then(() => undefined), new Promise<void>((res) => setTimeout(res, maxMs))]);
 }
 
-function hotelGroups(plan: TripPlan | Comparison): ChoiceGroup[] {
-  return plan.kind === "compare" ? plan.options.flatMap((o) => o.hotelOptions || []) : plan.hotelOptions || [];
-}
-
-function heroPhoto(plan: TripPlan | Comparison, extra: Record<string, string> = {}): string | undefined {
-  for (const g of hotelGroups(plan)) {
-    const url = photoOf(g.recommended) || g.alternatives.map(photoOf).find(Boolean) || extra[g.recommended.name];
+function heroPhoto(plan: TripPlan | Comparison): string | undefined {
+  const groups = plan.kind === "compare" ? plan.options.flatMap((o) => o.hotelOptions || []) : plan.hotelOptions || [];
+  for (const g of groups) {
+    const url = photoOf(g.recommended) || g.alternatives.map(photoOf).find(Boolean);
     if (url) return url;
   }
-  return extra[HERO_KEY];
+  return undefined;
 }
 
 export default function TripDetail() {
@@ -855,49 +639,6 @@ export default function TripDetail() {
   const [printAll, setPrintAll] = useState(false);
   const [making, setMaking] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
-  // Photos looked up for hotels the plan has none for, and for the hero when no hotel has one (see PhotoFallback).
-  // What the customer has picked in each flight / stay group (see Selection). Loaded with the page, saved a moment after each change.
-  const [picks, setPicks] = useState<Record<string, number>>({});
-  const picksRef = useRef<Record<string, number>>({});
-  const saveTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
-  function pick(gid: string, index: number) {
-    const next = { ...picksRef.current };
-    if (index > 0) next[gid] = index;
-    else delete next[gid];
-    picksRef.current = next;
-    setPicks(next);
-    if (gid.includes("|")) return; // a comparison's options are not saved
-    window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      api.post(`/api/plan/${key}/choices`, { choices: next }).catch(() => undefined); // the page still follows the pick if saving fails
-    }, 600);
-  }
-  const [extraPhotos, setExtraPhotos] = useState<Record<string, string>>({});
-  const photoWork = useRef<Promise<unknown>>(Promise.resolve());
-  const extraRef = useRef(extraPhotos);
-  useEffect(() => { extraRef.current = extraPhotos; }, [extraPhotos]);
-  useEffect(() => {
-    if (!data) return;
-    const plan = data.plan;
-    const groups = hotelGroups(plan);
-    const missing = Array.from(new Set(
-      groups.flatMap((g) => [g.recommended, ...g.alternatives]).filter((c) => c && c.name && !photoOf(c)).map((c) => c.name),
-    )).slice(0, 12);
-    const place = plan.kind === "compare" ? "" : (plan as TripPlan).stay?.[0]?.t || "";
-    const needHero = !groups.some((g) => photoOf(g.recommended) || g.alternatives.some(photoOf));
-    let alive = true;
-    const jobs: Promise<void>[] = missing.map((nm) =>
-      lookupPhoto(nm, nm).then((url) => { if (alive && url) setExtraPhotos((m) => (m[nm] ? m : { ...m, [nm]: url })); }),
-    );
-    if (needHero) {
-      // The trip's first stay, else the plan's own title, names the place the hero should show.
-      const q = (place || plan.title || "").slice(0, 120);
-      if (q) jobs.push(lookupPhoto(q).then((url) => { if (alive && url) setExtraPhotos((m) => (m[HERO_KEY] ? m : { ...m, [HERO_KEY]: url })); }));
-    }
-    photoWork.current = Promise.all(jobs);
-    return () => { alive = false; };
-  }, [data]);
   useEffect(() => {
     const before = () => flushSync(() => setPrintAll(true));   // also for ⌘P / Ctrl+P
     const after = () => setPrintAll(false);
@@ -913,11 +654,7 @@ export default function TripDetail() {
     if (!key) return;
     api
       .get<PlanResponse>(`/api/plan/${key}`)
-      .then((r) => {
-        picksRef.current = r.choices || {};
-        setPicks(picksRef.current);
-        setData(r);
-      })
+      .then(setData)
       .catch((err) =>
         setError({
           message: err instanceof ApiError ? err.message : "Could not load this trip.",
@@ -976,7 +713,7 @@ export default function TripDetail() {
   const compare = plan.kind === "compare";
   const tabs = compare ? plan.options.map((o) => o.name) : ["Plan", ...(plan.days.length ? ["Days"] : []), "Decisions"];
   const active = tabs.includes(tab) ? tab : tabs[0];
-  const hero = heroPhoto(plan, extraPhotos);
+  const hero = heroPhoto(plan);
   const asof = fmtDate(plan.asof, { day: "numeric", month: "short" });
   const prepared = fmtDate(plan.asof, { day: "numeric", month: "long", year: "numeric" });
   const name = member && member.name !== "Traveller" ? member.name : null;
@@ -988,9 +725,7 @@ export default function TripDetail() {
     setMaking(true);
     flushSync(() => setPrintAll(true));
     try {
-      await Promise.race([photoWork.current, new Promise((r) => setTimeout(r, 6000))]); // photos still being looked up
-      await new Promise((r) => setTimeout(r, 0)); // let them reach the page
-      await photosReady(cardRef.current, heroPhoto(plan, extraRef.current));
+      await photosReady(cardRef.current, hero);
       if (cardRef.current) await downloadItineraryPdf(cardRef.current, plan.title, name ? `Made for ${name}` : "");
     } catch {
       window.print();   // the file couldn't be made here; the print dialog still saves a PDF
@@ -1036,8 +771,6 @@ export default function TripDetail() {
   }
 
   return (
-    <PhotoFallback.Provider value={extraPhotos}>
-    <SelectionContext.Provider value={{ picks, pick }}>
     <div className="pv-page">
       {making ? (
         // Covers the page while every tab is laid out for the file, so it doesn't jump around.
@@ -1086,7 +819,5 @@ export default function TripDetail() {
         </div>
       </div>
     </div>
-    </SelectionContext.Provider>
-    </PhotoFallback.Provider>
   );
 }
