@@ -44,10 +44,18 @@ interface FlightLeg {
 interface Photo {
   url: string;
 }
+interface LivePrice {
+  amount: number;
+  currency?: string;
+  basis?: string;
+  checkedAt?: string;
+}
 interface Choice {
   name: string;
   details: string;
   price: string;
+  /** TripAgent's own live price for this exact flight / room, when the server could price it. */
+  live?: LivePrice;
   source?: string;
   photo?: Photo;
   photos?: Photo[];
@@ -56,6 +64,7 @@ interface Choice {
 interface ChoiceGroup {
   label: string;
   rateSearch?: { checkIn: string; checkOut: string };
+  flightSearch?: { adults?: number; children?: number; infants?: number };
   recommended: Choice;
   alternatives: Choice[];
 }
@@ -106,6 +115,8 @@ interface Comparison {
 interface PlanResponse {
   plan: TripPlan | Comparison;
   status: string;
+  /** What the customer picked last time: group id ("flight-0", "stay-0") -> option index (0 = our choice). */
+  choices?: Record<string, number>;
 }
 
 function useIsMobile(): boolean {
@@ -309,10 +320,66 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
   );
 }
 
+// What is picked in each flight / stay group, held by the page so everything that shows a price follows it. Group ids are the
+// trip calendar's ("flight-0", "stay-0"); a comparison's groups are prefixed with the option's name and are not saved.
+interface Selection {
+  picks: Record<string, number>;
+  pick: (gid: string, index: number) => void;
+}
+const SelectionContext = createContext<Selection>({ picks: {}, pick: () => undefined });
+
+function money(n: number, currency = "INR"): string {
+  const cur = currency.toUpperCase();
+  const v = Math.round(n);
+  return cur === "INR" ? "₹" + v.toLocaleString("en-IN") : `${cur} ${v.toLocaleString("en-US")}`;
+}
+
+function chosenOf(g: ChoiceGroup, picks: Record<string, number>, gid: string): Choice {
+  const options = [g.recommended, ...(g.alternatives || [])];
+  return options[picks[gid] || 0] || g.recommended;
+}
+
+/** What the customer's picks cost, from each picked choice's live price: one row per flight / stay, the total of the priced ones,
+ *  and what is still for the advisor to price. Follows Swap at once. */
+function SelectionCosts({ flights, hotels, prefix = "" }: { flights: ChoiceGroup[]; hotels: ChoiceGroup[]; prefix?: string }) {
+  const { picks } = useContext(SelectionContext);
+  const rows: { k: string; c: Choice }[] = [
+    ...flights.map((g, i) => ({ k: g.recommended.flight ? `${g.recommended.flight.depCity} → ${g.recommended.flight.arrCity}` : g.label, c: chosenOf(g, picks, `${prefix}flight-${i}`) })),
+    ...hotels.map((g, i) => ({ k: g.label, c: chosenOf(g, picks, `${prefix}stay-${i}`) })),
+  ];
+  if (!rows.length) return null;
+  const priced = rows.filter((r) => r.c.live && r.c.live.amount > 0);
+  const currencies = new Set(priced.map((r) => (r.c.live!.currency || "INR").toUpperCase()));
+  const total = priced.reduce((n, r) => n + r.c.live!.amount, 0);
+  const cur = currencies.size === 1 ? Array.from(currencies)[0] : "INR";
+  const open = rows.length - priced.length;
+  const party = [...flights, ...hotels].map((g) => g.flightSearch).find(Boolean);
+  const travellers = party ? (party.adults || 0) + (party.children || 0) : 0;
+  const stamps = priced.map((r) => r.c.live!.checkedAt).filter((x): x is string => !!x).sort();
+  const checked = stamps.length ? new Date(stamps[0]) : null;
+  const kv: KV[] = rows.map((r) => ({ k: `${r.k} · ${r.c.name}`, v: r.c.live && r.c.live.amount > 0 ? money(r.c.live.amount, r.c.live.currency) : "Your advisor confirms the price" }));
+  if (priced.length && currencies.size === 1) {
+    kv.push({ k: open ? "Total of the priced choices" : "Your total", v: money(total, cur) });
+  }
+  return (
+    <>
+      <CostTable rows={kv} />
+      <div className="pv-option-detail" style={{ marginTop: 8 }}>
+        {priced.length && currencies.size === 1 && travellers > 1 ? `About ${money(total / travellers, cur)} per traveller. ` : ""}
+        {open ? `${open} choice${open === 1 ? " is" : "s are"} not priced yet, so your advisor will confirm ${open === 1 ? "it" : "them"}. ` : ""}
+        {checked && !isNaN(checked.getTime()) ? `Live prices checked ${checked.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. ` : ""}
+        This follows what you pick above.
+      </div>
+    </>
+  );
+}
+
 /** "Our choice" plus its alternatives, with Swap — the template's recommendation group. */
-function ChoiceGroupView({ group, hotel }: { group: ChoiceGroup; hotel: boolean }) {
+function ChoiceGroupView({ group, hotel, gid }: { group: ChoiceGroup; hotel: boolean; gid: string }) {
   const mobile = useIsMobile();
-  const [selected, setSelected] = useState(0);
+  const { picks, pick } = useContext(SelectionContext);
+  const selected = picks[gid] || 0;
+  const setSelected = (i: number) => pick(gid, i);
   const options = [group.recommended, ...(group.alternatives || [])];
   const chosen = options[selected] || group.recommended;
   const badge = selected === 0 ? "Our choice" : "Selected";
@@ -408,6 +475,7 @@ function DefList({ rows }: { rows: KV[] }) {
 }
 
 function CostTable({ rows }: { rows: KV[] }) {
+  if (!rows.length) return null;
   return (
     <div className="pv-costtable">
       {rows.map((r, i) => (
@@ -429,6 +497,15 @@ function Callout({ note }: { note: Note }) {
   );
 }
 
+/** The plan's written cost lines. Once the flights and stays are priced above from the picks, the lines that repeat them (flights, hotels,
+ *  trip total) are dropped so the page never shows two different totals; with nothing priced the written lines stay as they were. */
+function otherCosts(rows: KV[], groups: ChoiceGroup[]): KV[] {
+  const anyLive = groups.some((g) => [g.recommended, ...(g.alternatives || [])].some((c) => c.live && c.live.amount > 0));
+  if (!anyLive) return rows;
+  const rest = rows.filter((r) => !/flight|fare|airfare|hotel|stay|accommodation|room|total|trip cost/i.test(r.k));
+  return rest.length ? rest : [];
+}
+
 function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
   const flights = plan.flightOptions || [];
   const hotels = plan.hotelOptions || [];
@@ -443,15 +520,17 @@ function PlanTab({ plan, onDays }: { plan: TripPlan; onDays: () => void }) {
       ) : null}
 
       {flights.length || plan.move.length ? <h2 className="pv-section-title">Getting there</h2> : null}
-      {flights.length ? flights.map((g, i) => <ChoiceGroupView key={i} group={g} hotel={false} />) : <RowList rows={plan.move} />}
+      {flights.length ? flights.map((g, i) => <ChoiceGroupView key={i} group={g} hotel={false} gid={`flight-${i}`} />) : <RowList rows={plan.move} />}
 
       {hotels.length || plan.stay.length ? <h2 className="pv-section-title">Where you stay</h2> : null}
-      {hotels.length ? hotels.map((g, i) => <ChoiceGroupView key={i} group={g} hotel />) : <RowList rows={plan.stay} />}
+      {hotels.length ? hotels.map((g, i) => <ChoiceGroupView key={i} group={g} hotel gid={`stay-${i}`} />) : <RowList rows={plan.stay} />}
 
+      {flights.length || hotels.length || plan.allowance.length ? <h2 className="pv-section-title">What it costs</h2> : null}
+      <SelectionCosts flights={flights} hotels={hotels} />
       {plan.allowance.length ? (
         <>
-          <h2 className="pv-section-title">What it costs</h2>
-          <CostTable rows={plan.allowance} />
+          {flights.length || hotels.length ? <div style={{ height: 14 }} /> : null}
+          <CostTable rows={otherCosts(plan.allowance, [...flights, ...hotels])} />
         </>
       ) : null}
 
@@ -610,7 +689,7 @@ function OptionTab({ o }: { o: Option }) {
         <>
           <h2 className="pv-section-title">Getting there</h2>
           {o.flightOptions.map((g, i) => (
-            <ChoiceGroupView key={i} group={g} hotel={false} />
+            <ChoiceGroupView key={i} group={g} hotel={false} gid={`${o.name}|flight-${i}`} />
           ))}
         </>
       ) : null}
@@ -618,12 +697,13 @@ function OptionTab({ o }: { o: Option }) {
         <>
           <h2 className="pv-section-title">Where you stay</h2>
           {o.hotelOptions.map((g, i) => (
-            <ChoiceGroupView key={i} group={g} hotel />
+            <ChoiceGroupView key={i} group={g} hotel gid={`${o.name}|stay-${i}`} />
           ))}
         </>
       ) : null}
       <h2 className="pv-section-title">What it costs</h2>
-      <CostTable rows={[{ k: "Trip total", v: o.allin || o.price }]} />
+      {o.flightOptions?.length || o.hotelOptions?.length ? <SelectionCosts flights={o.flightOptions || []} hotels={o.hotelOptions || []} prefix={`${o.name}|`} /> : null}
+      <CostTable rows={[{ k: "Trip total (indicative)", v: o.allin || o.price }]} />
       {o.tradeoffs?.length || o.catch ? (
         <>
           <h2 className="pv-section-title">Worth knowing</h2>
@@ -676,6 +756,23 @@ export default function TripDetail() {
   const [making, setMaking] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
   // Photos looked up for hotels the plan has none for, and for the hero when no hotel has one (see PhotoFallback).
+  // What the customer has picked in each flight / stay group (see Selection). Loaded with the page, saved a moment after each change.
+  const [picks, setPicks] = useState<Record<string, number>>({});
+  const picksRef = useRef<Record<string, number>>({});
+  const saveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
+  function pick(gid: string, index: number) {
+    const next = { ...picksRef.current };
+    if (index > 0) next[gid] = index;
+    else delete next[gid];
+    picksRef.current = next;
+    setPicks(next);
+    if (gid.includes("|")) return; // a comparison's options are not saved
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      api.post(`/api/plan/${key}/choices`, { choices: next }).catch(() => undefined); // the page still follows the pick if saving fails
+    }, 600);
+  }
   const [extraPhotos, setExtraPhotos] = useState<Record<string, string>>({});
   const photoWork = useRef<Promise<unknown>>(Promise.resolve());
   const extraRef = useRef(extraPhotos);
@@ -716,7 +813,11 @@ export default function TripDetail() {
     if (!key) return;
     api
       .get<PlanResponse>(`/api/plan/${key}`)
-      .then(setData)
+      .then((r) => {
+        picksRef.current = r.choices || {};
+        setPicks(picksRef.current);
+        setData(r);
+      })
       .catch((err) =>
         setError({
           message: err instanceof ApiError ? err.message : "Could not load this trip.",
@@ -836,6 +937,7 @@ export default function TripDetail() {
 
   return (
     <PhotoFallback.Provider value={extraPhotos}>
+    <SelectionContext.Provider value={{ picks, pick }}>
     <div className="pv-page">
       {making ? (
         // Covers the page while every tab is laid out for the file, so it doesn't jump around.
@@ -884,6 +986,7 @@ export default function TripDetail() {
         </div>
       </div>
     </div>
+    </SelectionContext.Provider>
     </PhotoFallback.Provider>
   );
 }
