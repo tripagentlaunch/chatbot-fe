@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
@@ -123,6 +123,38 @@ function photoOf(c: Choice): string | undefined {
   return c.photo?.url || c.photos?.[0]?.url;
 }
 
+// Photos Tara's plan came without (and the server could not attach when the page was first opened): looked up here, once per
+// name, from the server's place-photo lookup, and shown in the same cards, hero and PDF as the saved ones.
+const PhotoFallback = createContext<Record<string, string>>({});
+const HERO_KEY = "__hero";
+function useChoicePhoto(c: Choice): string | undefined {
+  const extra = useContext(PhotoFallback);
+  return photoOf(c) || extra[c.name];
+}
+
+/** "2026-12-22T08:50" / "2026-12-22 08:50:00" -> "08:50"; anything already a clock time is left as it is. */
+function clock(v: string | undefined): string {
+  if (!v) return "TBC";
+  const m = /(?:T|\s)(\d{1,2}:\d{2})/.exec(v);
+  return m ? m[1].padStart(5, "0") : v;
+}
+
+const photoMemo = new Map<string, Promise<string | null>>();
+function lookupPhoto(q: string, name?: string): Promise<string | null> {
+  const k = q + "|" + (name || "");
+  let hit = photoMemo.get(k);
+  if (!hit) {
+    hit = api
+      .get<{ photo?: { url?: string } | null; photos?: { url?: string }[] }>(
+        `/api/place-photo?q=${encodeURIComponent(q)}${name ? `&name=${encodeURIComponent(name)}` : ""}&w=1200`,
+      )
+      .then((r) => r.photo?.url || r.photos?.[0]?.url || null)
+      .catch(() => null);
+    photoMemo.set(k, hit);
+  }
+  return hit;
+}
+
 function hideBrokenImage(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = "none";
 }
@@ -207,7 +239,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
       {f ? (
         <div className="pv-recflight-row">
           <div>
-            <div className="pv-recflight-time">{f.depTime || "TBC"}</div>
+            <div className="pv-recflight-time">{clock(f.depTime)}</div>
             <div className="pv-recflight-city">{f.depCity}</div>
           </div>
           <div className="pv-recflight-mid">
@@ -216,7 +248,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
             <div className="pv-recflight-sub">{[f.duration, f.cabin].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="pv-recflight-time">{f.arrTime || "TBC"}</div>
+            <div className="pv-recflight-time">{clock(f.arrTime)}</div>
             <div className="pv-recflight-city">{f.arrCity}</div>
           </div>
         </div>
@@ -230,7 +262,7 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
 }
 
 function StayCard({ c, badge }: { c: Choice; badge: string }) {
-  const img = photoOf(c);
+  const img = useChoicePhoto(c);
   return (
     <div className="pv-recstay-stacked">
       <div className="pv-recstay-stacked-media">
@@ -253,7 +285,8 @@ function StayCard({ c, badge }: { c: Choice; badge: string }) {
 }
 
 function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: () => void }) {
-  const img = hotel ? photoOf(c) : undefined;
+  const found = useChoicePhoto(c);
+  const img = hotel ? found : undefined;
   return (
     <div className="pv-option">
       {img ? <img className="pv-option-thumb" src={img} alt="" onError={hideBrokenImage} /> : null}
@@ -261,7 +294,7 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
         <OptionName c={c} block />
         {c.flight ? (
           <div className="pv-option-timing">
-            {c.flight.depTime || "TBC"} – {c.flight.arrTime || "TBC"}
+            {clock(c.flight.depTime)} – {clock(c.flight.arrTime)}
           </div>
         ) : null}
         <div className="pv-option-detail">{c.details}</div>
@@ -617,13 +650,16 @@ function photosReady(root: HTMLElement | null, hero: string | undefined, maxMs =
   return Promise.race([Promise.all(waits).then(() => undefined), new Promise<void>((res) => setTimeout(res, maxMs))]);
 }
 
-function heroPhoto(plan: TripPlan | Comparison): string | undefined {
-  const groups = plan.kind === "compare" ? plan.options.flatMap((o) => o.hotelOptions || []) : plan.hotelOptions || [];
-  for (const g of groups) {
-    const url = photoOf(g.recommended) || g.alternatives.map(photoOf).find(Boolean);
+function hotelGroups(plan: TripPlan | Comparison): ChoiceGroup[] {
+  return plan.kind === "compare" ? plan.options.flatMap((o) => o.hotelOptions || []) : plan.hotelOptions || [];
+}
+
+function heroPhoto(plan: TripPlan | Comparison, extra: Record<string, string> = {}): string | undefined {
+  for (const g of hotelGroups(plan)) {
+    const url = photoOf(g.recommended) || g.alternatives.map(photoOf).find(Boolean) || extra[g.recommended.name];
     if (url) return url;
   }
-  return undefined;
+  return extra[HERO_KEY];
 }
 
 export default function TripDetail() {
@@ -639,6 +675,32 @@ export default function TripDetail() {
   const [printAll, setPrintAll] = useState(false);
   const [making, setMaking] = useState(false);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  // Photos looked up for hotels the plan has none for, and for the hero when no hotel has one (see PhotoFallback).
+  const [extraPhotos, setExtraPhotos] = useState<Record<string, string>>({});
+  const photoWork = useRef<Promise<unknown>>(Promise.resolve());
+  const extraRef = useRef(extraPhotos);
+  useEffect(() => { extraRef.current = extraPhotos; }, [extraPhotos]);
+  useEffect(() => {
+    if (!data) return;
+    const plan = data.plan;
+    const groups = hotelGroups(plan);
+    const missing = Array.from(new Set(
+      groups.flatMap((g) => [g.recommended, ...g.alternatives]).filter((c) => c && c.name && !photoOf(c)).map((c) => c.name),
+    )).slice(0, 12);
+    const place = plan.kind === "compare" ? "" : (plan as TripPlan).stay?.[0]?.t || "";
+    const needHero = !groups.some((g) => photoOf(g.recommended) || g.alternatives.some(photoOf));
+    let alive = true;
+    const jobs: Promise<void>[] = missing.map((nm) =>
+      lookupPhoto(nm, nm).then((url) => { if (alive && url) setExtraPhotos((m) => (m[nm] ? m : { ...m, [nm]: url })); }),
+    );
+    if (needHero) {
+      // The trip's first stay, else the plan's own title, names the place the hero should show.
+      const q = (place || plan.title || "").slice(0, 120);
+      if (q) jobs.push(lookupPhoto(q).then((url) => { if (alive && url) setExtraPhotos((m) => (m[HERO_KEY] ? m : { ...m, [HERO_KEY]: url })); }));
+    }
+    photoWork.current = Promise.all(jobs);
+    return () => { alive = false; };
+  }, [data]);
   useEffect(() => {
     const before = () => flushSync(() => setPrintAll(true));   // also for ⌘P / Ctrl+P
     const after = () => setPrintAll(false);
@@ -713,7 +775,7 @@ export default function TripDetail() {
   const compare = plan.kind === "compare";
   const tabs = compare ? plan.options.map((o) => o.name) : ["Plan", ...(plan.days.length ? ["Days"] : []), "Decisions"];
   const active = tabs.includes(tab) ? tab : tabs[0];
-  const hero = heroPhoto(plan);
+  const hero = heroPhoto(plan, extraPhotos);
   const asof = fmtDate(plan.asof, { day: "numeric", month: "short" });
   const prepared = fmtDate(plan.asof, { day: "numeric", month: "long", year: "numeric" });
   const name = member && member.name !== "Traveller" ? member.name : null;
@@ -725,7 +787,9 @@ export default function TripDetail() {
     setMaking(true);
     flushSync(() => setPrintAll(true));
     try {
-      await photosReady(cardRef.current, hero);
+      await Promise.race([photoWork.current, new Promise((r) => setTimeout(r, 6000))]); // photos still being looked up
+      await new Promise((r) => setTimeout(r, 0)); // let them reach the page
+      await photosReady(cardRef.current, heroPhoto(plan, extraRef.current));
       if (cardRef.current) await downloadItineraryPdf(cardRef.current, plan.title, name ? `Made for ${name}` : "");
     } catch {
       window.print();   // the file couldn't be made here; the print dialog still saves a PDF
@@ -771,6 +835,7 @@ export default function TripDetail() {
   }
 
   return (
+    <PhotoFallback.Provider value={extraPhotos}>
     <div className="pv-page">
       {making ? (
         // Covers the page while every tab is laid out for the file, so it doesn't jump around.
@@ -819,5 +884,6 @@ export default function TripDetail() {
         </div>
       </div>
     </div>
+    </PhotoFallback.Provider>
   );
 }
