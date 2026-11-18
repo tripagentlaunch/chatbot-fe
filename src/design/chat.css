@@ -1021,3 +1021,6 @@ html:has(.tc-root) body {
   cursor: pointer;
 }
 .tc-handoff__go:disabled { opacity: 0.4; cursor: default; }
+
+/* Back after a gap: a brief greeting by name (2026-11-18). */
+.tc-welcome { color: var(--tc-ivory-2); font-size: 13px; }

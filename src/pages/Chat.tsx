@@ -6,7 +6,7 @@ import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
 import TopNav from "../design/TopNav";
-import { capFirst, useAssistantName } from "../context/AuthContext";
+import { capFirst, useAssistantName, useAuth } from "../context/AuthContext";
 import { ArrowUpRight, ChevronLeft, Horizon, Phone, WhatsApp } from "../design/icons";
 import "../design/chat.css";
 
@@ -75,6 +75,19 @@ function dayLabel(at: number): string {
   return `${new Date(at).toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}, ${clock}`;
 }
 const toMs = (at?: number) => (at ? (at < 1e12 ? at * 1000 : at) : Date.now());
+// The member's first name for a greeting (2026-11-18: everyone likes to be greeted by name). A member
+// code or guest id is not a name.
+function firstName(name?: string | null): string | null {
+  const n = (name ?? "").trim();
+  if (!n || /^[A-Z0-9]{6,}$/.test(n.replace(/\s/g, "")) || n.includes("@")) return null;
+  const f = n.split(/\s+/)[0].replace(/[,.]$/, "");
+  if (!f || ["guest", "member", "traveller", "traveler", "user", "unknown"].includes(f.toLowerCase())) return null;
+  return f.charAt(0).toUpperCase() + f.slice(1);
+}
+
+// Back after this long without a message: a brief "Good evening, Ketan." above the composer.
+const WELCOME_BACK_MS = 6 * 3600 * 1000;
+
 function timeOfDay(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -99,8 +112,11 @@ function toDisplay(list: HistoryMessage[]): DisplayMessage[] {
     .map((m, i) => ({ id: m.id ?? `h-${i}`, role: m.role as "user" | "assistant", text: m.content, at: toMs(m.at) }));
 }
 
-export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
+export default function Chat({ memberName: memberNameProp, onBack, onCall, onAuthError, seed }: Props = {}) {
   const assistant = useAssistantName();
+  // App renders <Chat /> without props, so the name comes from the signed-in member.
+  const { member } = useAuth();
+  const memberName = firstName(memberNameProp ?? member?.name) ?? undefined;
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [pending, setPending] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,6 +143,9 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [capped, setCapped] = useState<string | null>(null);
   const [agentNote, setAgentNote] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
+  // Back after a gap: greet them by name once, until they write (2026-11-18).
+  const [welcomeBack, setWelcomeBack] = useState(false);
+  const greeted = useRef(false);
   // A trip handed over from the website (2026-11-18): claimed once signed in, then the answers card.
   const [handoff, setHandoff] = useState<HandoffView | null>(null);
   const lastSent = useRef("");
@@ -152,6 +171,12 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       .then((res) => {
         setMessages(toDisplay(res.messages));
         serverLenRef.current = res.messages.length;
+        const last = res.messages[res.messages.length - 1];
+        const lastAt = last ? toMs(last.at) : 0;
+        if (!greeted.current && last && !sessionStorage.getItem(HANDOFF_KEY) && Date.now() - lastAt > WELCOME_BACK_MS) {
+          greeted.current = true;
+          setWelcomeBack(true);
+        }
       })
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) onAuthError?.();
@@ -225,6 +250,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   /** `resend`: the member's line is already in the thread, so repeat the turn, not the bubble. */
   async function send(text: string, resend = false, files: ChatAttachment[] = []) {
     setHandoff(null); // any reply answers the card (they may type instead)
+    setWelcomeBack(false);
     setBusy(true);
     busyRef.current = true;
     setPending("");
@@ -422,6 +448,13 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             </Fragment>
           );
         })}
+
+        {welcomeBack && !busy && (
+          <p className="tc-divider tc-welcome" role="status">
+            {timeOfDay()}
+            {memberName ? `, ${memberName}` : ""}. Good to see you again.
+          </p>
+        )}
 
         {handoff && !busy && messages[messages.length - 1]?.role === "assistant" && (
           <div className="tc-row">
