@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import ChatInput from "../components/ChatInput";
 import MessageBubble from "../components/MessageBubble";
+import TripHandoffCard, { type HandoffView } from "../components/TripHandoffCard";
 import { api, ApiError, streamChat, type ChatAttachment } from "../api/client";
 import type { HistoryMessage } from "../types";
 import MeshBackdrop from "../design/MeshBackdrop";
@@ -90,6 +91,14 @@ function TypingDots({ who }: { who: string }) {
   );
 }
 
+export const HANDOFF_KEY = "tara.handoff";
+
+function toDisplay(list: HistoryMessage[]): DisplayMessage[] {
+  return list
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m, i) => ({ id: m.id ?? `h-${i}`, role: m.role as "user" | "assistant", text: m.content, at: toMs(m.at) }));
+}
+
 export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: Props = {}) {
   const assistant = useAssistantName();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -118,6 +127,8 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
   const [capped, setCapped] = useState<string | null>(null);
   const [agentNote, setAgentNote] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
+  // A trip handed over from the website (2026-11-18): claimed once signed in, then the answers card.
+  const [handoff, setHandoff] = useState<HandoffView | null>(null);
   const lastSent = useRef("");
   const lastFiles = useRef<ChatAttachment[]>([]);
   const seeded = useRef(false);
@@ -139,16 +150,7 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
     api
       .get<{ messages: HistoryMessage[] }>("/api/history")
       .then((res) => {
-        setMessages(
-          res.messages
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m, i) => ({
-              id: m.id ?? `h-${i}`,
-              role: m.role as "user" | "assistant",
-              text: m.content,
-              at: toMs(m.at),
-            })),
-        );
+        setMessages(toDisplay(res.messages));
         serverLenRef.current = res.messages.length;
       })
       .catch((err) => {
@@ -160,6 +162,27 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The website's "Hand to Tara AI" left a token (App.tsx keeps it in sessionStorage): claim it, which
+  // attaches the trip and saves Tara's greeting, then show the greeting and the answers card.
+  useEffect(() => {
+    if (!historyReady) return;
+    const token = sessionStorage.getItem(HANDOFF_KEY);
+    const claimed = token
+      ? api.post(`/api/handoff/${encodeURIComponent(token)}/claim`).then(
+          () => api.get<{ messages: HistoryMessage[] }>("/api/history").then((res) => {
+            setMessages(toDisplay(res.messages));
+            serverLenRef.current = res.messages.length;
+          }),
+          (err) => setAgentNote(err instanceof ApiError ? err.message : "We couldn't open that trip. Hand it to us again from the website."),
+        ).finally(() => sessionStorage.removeItem(HANDOFF_KEY))
+      : Promise.resolve();
+    claimed
+      .then(() => api.get<{ handoff: HandoffView | null; answered?: boolean }>("/api/handoff/active"))
+      .then((res) => setHandoff(res && res.handoff && !res.answered ? res.handoff : null))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyReady]);
 
   // Poll history for messages that appeared server-side without a local turn —
   // i.e. a human desk advisor replying from the admin console. Skips while a
@@ -197,10 +220,11 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, pending]);
+  }, [messages, pending, handoff]);
 
   /** `resend`: the member's line is already in the thread, so repeat the turn, not the bubble. */
   async function send(text: string, resend = false, files: ChatAttachment[] = []) {
+    setHandoff(null); // any reply answers the card (they may type instead)
     setBusy(true);
     busyRef.current = true;
     setPending("");
@@ -398,6 +422,12 @@ export default function Chat({ memberName, onBack, onCall, onAuthError, seed }: 
             </Fragment>
           );
         })}
+
+        {handoff && !busy && messages[messages.length - 1]?.role === "assistant" && (
+          <div className="tc-row">
+            <TripHandoffCard view={handoff} onSend={(t) => send(t)} disabled={busy} />
+          </div>
+        )}
 
         {heldNote && !busy && <p className="tc-activity" role="status">{heldNote}</p>}
 

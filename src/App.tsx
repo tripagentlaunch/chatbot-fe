@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, AuthProvider, useAuth } from "./context/AuthContext";
 import AuthScreen from "./design/AuthScreen";
-import Chat from "./pages/Chat";
+import Chat, { HANDOFF_KEY } from "./pages/Chat";
 import Login from "./pages/Login";
 import TripDetail from "./pages/TripDetail";
 import Trips from "./pages/Trips";
@@ -27,6 +27,15 @@ function CodeHandoff({ children }: { children: JSX.Element }) {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const [code] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("code"));
+  // A trip handed over from the website rides in the same #fragment (#handoff=TOKEN), never in a URL a
+  // server logs. It waits in this tab's sessionStorage until the member is signed in; Chat claims it.
+  useState(() => {
+    const h = new URLSearchParams(window.location.hash.slice(1)).get("handoff");
+    if (h) {
+      sessionStorage.setItem(HANDOFF_KEY, h);
+      if (!code) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  });
   const [working, setWorking] = useState(!!code);
   const tried = useRef(false);
   useEffect(() => {
