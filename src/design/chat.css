@@ -1066,3 +1066,23 @@ html:has(.tc-root) body {
 .tc-handoff__note { margin: 0; color: var(--tc-ivory-2); font-size: 14px; line-height: 20px; }
 .tc-handoff__act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .tc-handoff__hint { color: var(--tc-ivory-3); font-size: 12px; }
+
+/* Compact rows (2026-11-19): label left, one control right, one line each. */
+.tc-handoff { gap: 12px; padding: 14px 16px; }
+.tc-handoff__trip { gap: 8px; padding-bottom: 12px; }
+.tc-handoff__rows { display: grid; gap: 8px; }
+.tc-handoff__row { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; column-gap: 12px; min-height: 30px; }
+.tc-handoff__k { color: var(--tc-ivory-3); font-size: 13px; line-height: 18px; }
+.tc-handoff__v { display: inline-flex; align-items: baseline; gap: 10px; color: var(--tc-ivory); font-size: 14px; line-height: 20px; flex-wrap: wrap; }
+.tc-handoff__seg { display: inline-flex; justify-self: start; padding: 2px; gap: 2px; border-radius: 999px; border: 1px solid rgba(242, 237, 228, 0.16); }
+.tc-handoff__seg button { min-width: 40px; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--tc-ivory-2); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; font-variant-numeric: tabular-nums; }
+.tc-handoff__seg button.is-on { background: var(--tc-ivory); color: var(--tc-ink); }
+.tc-handoff__select { justify-self: start; height: 30px; padding: 0 30px 0 12px; border-radius: 999px; border: 1px solid rgba(242, 237, 228, 0.18);
+  background: transparent; color: var(--tc-ivory); font: inherit; font-size: 13px; appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--tc-ivory-3) 50%), linear-gradient(135deg, var(--tc-ivory-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 13px, calc(100% - 10px) 13px; background-size: 5px 5px; background-repeat: no-repeat; }
+.tc-handoff__select option { color: #14110d; }
+.tc-handoff__select:focus-visible, .tc-handoff__seg button:focus-visible { outline: 2px solid var(--tc-champagne); outline-offset: 2px; }
+.tc-handoff .tc-handoff__text { justify-self: start; width: min(100%, 240px); }
+@media (max-width: 420px) { .tc-handoff__row { grid-template-columns: 70px minmax(0, 1fr); } }

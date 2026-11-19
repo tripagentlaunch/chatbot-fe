@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 
-// The answers card under Tara's greeting when a trip is handed over from the website (2026-11-18).
-// Only what the trip leaves open is asked (the backend says which: travellers, origin, when); the
-// member taps or types, and the answers go to Tara as one ordinary message, so she builds the
-// itinerary in that turn. They can always ignore the card and just type.
+// The trip handed over from the website, under Tara's greeting (2026-11-18; compact rows 2026-11-19).
+// It shows everything the member picked, confirms what we already know (where they travel from, the
+// budget) and asks only what the trip leaves open, one short row each. Nothing is built, and no model
+// is called, until they tap Build my itinerary; their answers then go to Tara as one ordinary message.
 
 export type HandoffView = {
   trip: {
@@ -11,6 +11,7 @@ export type HandoffView = {
     legs: { city: string; name: string; days: number; picks: number; items?: string[] }[];
   };
   budget: string | null;
+  origin?: string | null;
   missing: ("travellers" | "origin" | "when")[];
   questions: Record<string, string>;
   tooLong?: boolean;
@@ -18,17 +19,15 @@ export type HandoffView = {
 };
 
 const PARTY = [
-  { label: "Just me", text: "just me" },
-  { label: "Two of us", text: "two of us" },
-  { label: "3 to 4", text: "three or four of us" },
-  { label: "5 or more", text: "five or more of us" },
+  { label: "1", text: "just me" },
+  { label: "2", text: "two of us" },
+  { label: "3–4", text: "three or four of us" },
+  { label: "5+", text: "five or more of us" },
 ];
-const FROM = ["Mumbai", "Delhi", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Pune", "Dubai"];
 
 function nextMonths(n = 12): string[] {
   const out: string[] = [];
   const d = new Date();
-  d.setDate(1);
   for (let i = 1; i <= n; i++) {
     const m = new Date(d.getFullYear(), d.getMonth() + i, 1);
     out.push(m.toLocaleString("en-GB", { month: "long", year: "numeric" }));
@@ -38,22 +37,20 @@ function nextMonths(n = 12): string[] {
 
 export default function TripHandoffCard({ view, onSend, disabled }: { view: HandoffView; onSend: (text: string) => void; disabled?: boolean }) {
   const months = useMemo(() => nextMonths(), []);
+  const asks = new Set(view.missing);
   const [party, setParty] = useState<string | null>(null);
-  const [partyCount, setPartyCount] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [when, setWhen] = useState<string | null>(null);
+  const [origin, setOrigin] = useState(view.origin ?? "");
+  const [editOrigin, setEditOrigin] = useState(!view.origin);
+  const [when, setWhen] = useState("");
   const [budget, setBudget] = useState("");
   const [editBudget, setEditBudget] = useState(false);
 
-  const asks = new Set(view.missing);
-  const partyText = partyCount.trim() ? `${partyCount.trim()} of us` : party;
-  const ready =
-    (!asks.has("travellers") || !!partyText) && (!asks.has("origin") || !!origin.trim()) && (!asks.has("when") || !!when);
+  const ready = (!asks.has("travellers") || !!party) && !!origin.trim() && (!asks.has("when") || !!when);
 
   function submit() {
     const bits: string[] = [];
-    if (asks.has("travellers") && partyText) bits.push(partyText === "just me" ? "It's just me travelling" : `We're ${partyText} travelling`);
-    if (asks.has("origin") && origin.trim()) bits.push(`from ${origin.trim()}`);
+    if (asks.has("travellers") && party) bits.push(party === "just me" ? "It's just me travelling" : `We're ${party} travelling`);
+    if (origin.trim()) bits.push(`from ${origin.trim()}`);
     if (asks.has("when") && when) bits.push(when === "Flexible" ? "and our dates are flexible" : `in ${when}`);
     let text = bits.join(", ").replace(/, and/, " and") + ".";
     if (editBudget && budget.trim()) text += ` Budget: ${budget.trim()}.`;
@@ -62,8 +59,6 @@ export default function TripHandoffCard({ view, onSend, disabled }: { view: Hand
     onSend(text.charAt(0).toUpperCase() + text.slice(1));
   }
 
-  // Everything they picked on the website, so they see it arrived whole (2026-11-19). Nothing is built
-  // until they press the button: no tokens are spent on a trip that's only being looked at.
   const summary = (
     <div className="tc-handoff__trip">
       <p className="tc-handoff__eyebrow">Your trip from TripAgent · {view.trip.totalDays} days</p>
@@ -94,55 +89,57 @@ export default function TripHandoffCard({ view, onSend, disabled }: { view: Hand
   return (
     <div className="tc-handoff" role="group" aria-label="Your trip details">
       {summary}
-      {asks.has("travellers") && (
-        <div className="tc-handoff__q">
-          <p className="tc-handoff__label">{view.questions.travellers}</p>
-          <div className="tc-handoff__opts">
-            {PARTY.map((p) => (
-              <button key={p.label} type="button" className={`tc-chip${party === p.text && !partyCount ? " is-on" : ""}`}
-                onClick={() => { setParty(p.text); setPartyCount(""); }}>
-                {p.label}
-              </button>
-            ))}
-            <input className="tc-handoff__num" inputMode="numeric" placeholder="or a number" value={partyCount}
-              onChange={(e) => setPartyCount(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))} aria-label="How many are travelling" />
+      <div className="tc-handoff__rows">
+        {asks.has("travellers") && (
+          <div className="tc-handoff__row">
+            <span className="tc-handoff__k" id="hk-party">Travellers</span>
+            <div className="tc-handoff__seg" role="radiogroup" aria-labelledby="hk-party">
+              {PARTY.map((p) => (
+                <button key={p.label} type="button" role="radio" aria-checked={party === p.text}
+                  className={party === p.text ? "is-on" : ""} onClick={() => setParty(p.text)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-      {asks.has("origin") && (
-        <div className="tc-handoff__q">
-          <p className="tc-handoff__label">{view.questions.origin}</p>
-          <div className="tc-handoff__opts">
-            {FROM.map((c) => (
-              <button key={c} type="button" className={`tc-chip${origin === c ? " is-on" : ""}`} onClick={() => setOrigin(c)}>{c}</button>
-            ))}
-            <input className="tc-handoff__text" placeholder="Another city" value={FROM.includes(origin) ? "" : origin}
-              onChange={(e) => setOrigin(e.target.value.slice(0, 60))} aria-label="City you start from" />
-          </div>
-        </div>
-      )}
-      {asks.has("when") && (
-        <div className="tc-handoff__q">
-          <p className="tc-handoff__label">{view.questions.when}</p>
-          <div className="tc-handoff__opts tc-handoff__opts--scroll">
-            {["Flexible", ...months].map((m) => (
-              <button key={m} type="button" className={`tc-chip${when === m ? " is-on" : ""}`} onClick={() => setWhen(m)}>{m}</button>
-            ))}
-          </div>
-        </div>
-      )}
-      {view.budget && (
-        <div className="tc-handoff__q">
-          <p className="tc-handoff__label">
-            Budget: {view.budget}{" "}
-            {!editBudget && <button type="button" className="tc-handoff__change" onClick={() => setEditBudget(true)}>Change</button>}
-          </p>
-          {editBudget && (
-            <input className="tc-handoff__text tc-handoff__text--wide" placeholder="Your budget, e.g. ₹25 L per person" value={budget}
-              onChange={(e) => setBudget(e.target.value.slice(0, 80))} autoFocus aria-label="Your budget" />
+        )}
+        <div className="tc-handoff__row">
+          <span className="tc-handoff__k">From</span>
+          {editOrigin ? (
+            <input className="tc-handoff__text" placeholder="Your city" value={origin} autoFocus={!!view.origin}
+              onChange={(e) => setOrigin(e.target.value.slice(0, 60))} aria-label="City you travel from" />
+          ) : (
+            <span className="tc-handoff__v">
+              {origin}
+              <button type="button" className="tc-handoff__change" onClick={() => setEditOrigin(true)}>Change</button>
+            </span>
           )}
         </div>
-      )}
+        {asks.has("when") && (
+          <div className="tc-handoff__row">
+            <label className="tc-handoff__k" htmlFor="hk-when">When</label>
+            <select id="hk-when" className="tc-handoff__select" value={when} onChange={(e) => setWhen(e.target.value)}>
+              <option value="" disabled>Choose a month</option>
+              <option value="Flexible">Flexible</option>
+              {months.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        )}
+        {view.budget && (
+          <div className="tc-handoff__row">
+            <span className="tc-handoff__k">Budget</span>
+            {editBudget ? (
+              <input className="tc-handoff__text" placeholder="e.g. ₹25 L per person" value={budget} autoFocus
+                onChange={(e) => setBudget(e.target.value.slice(0, 80))} aria-label="Your budget" />
+            ) : (
+              <span className="tc-handoff__v">
+                {view.budget}
+                <button type="button" className="tc-handoff__change" onClick={() => setEditBudget(true)}>Change</button>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
       <div className="tc-handoff__act">
         <button type="button" className="tc-handoff__go" disabled={!ready || disabled} onClick={submit}>
           Build my itinerary
