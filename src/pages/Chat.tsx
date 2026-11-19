@@ -458,7 +458,7 @@ export default function Chat({ memberName: memberNameProp, onBack, onCall, onAut
 
         {handoff && !busy && messages[messages.length - 1]?.role === "assistant" && (
           <div className="tc-row">
-            <TripHandoffCard view={handoff} />
+            <TripHandoffCard view={handoff} onSend={(t) => send(t)} sendLabel={`Send to ${capFirst(assistant)}`} />
           </div>
         )}
 
