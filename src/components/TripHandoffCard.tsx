@@ -6,10 +6,15 @@ import { useMemo, useState } from "react";
 // itinerary in that turn. They can always ignore the card and just type.
 
 export type HandoffView = {
-  trip: { name: string | null; totalDays: number; picks: number; legs: { city: string; name: string; days: number; picks: number }[] };
+  trip: {
+    name: string | null; totalDays: number; picks: number;
+    legs: { city: string; name: string; days: number; picks: number; items?: string[] }[];
+  };
   budget: string | null;
   missing: ("travellers" | "origin" | "when")[];
   questions: Record<string, string>;
+  tooLong?: boolean;
+  maxDays?: number;
 };
 
 const PARTY = [
@@ -57,8 +62,38 @@ export default function TripHandoffCard({ view, onSend, disabled }: { view: Hand
     onSend(text.charAt(0).toUpperCase() + text.slice(1));
   }
 
+  // Everything they picked on the website, so they see it arrived whole (2026-11-19). Nothing is built
+  // until they press the button: no tokens are spent on a trip that's only being looked at.
+  const summary = (
+    <div className="tc-handoff__trip">
+      <p className="tc-handoff__eyebrow">Your trip from TripAgent · {view.trip.totalDays} days</p>
+      <ol className="tc-handoff__legs">
+        {view.trip.legs.map((l) => (
+          <li key={l.city}>
+            <span className="tc-handoff__leg">{l.name}</span>
+            <span className="tc-handoff__days">{l.days} {l.days === 1 ? "day" : "days"}</span>
+            {l.items && l.items.length > 0 && <span className="tc-handoff__picks">{l.items.join(" · ")}</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+
+  if (view.tooLong) {
+    return (
+      <div className="tc-handoff" role="group" aria-label="Your trip">
+        {summary}
+        <p className="tc-handoff__note">
+          Itineraries here go up to {view.maxDays ?? 15} days. Your TripAgent advisor plans longer trips with you directly: call or
+          WhatsApp from the top of this chat, or shorten the trip on the website and send it again.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="tc-handoff" role="group" aria-label="Your trip details">
+      {summary}
       {asks.has("travellers") && (
         <div className="tc-handoff__q">
           <p className="tc-handoff__label">{view.questions.travellers}</p>
@@ -108,9 +143,12 @@ export default function TripHandoffCard({ view, onSend, disabled }: { view: Hand
           )}
         </div>
       )}
-      <button type="button" className="tc-handoff__go" disabled={!ready || disabled} onClick={submit}>
-        Build my itinerary
-      </button>
+      <div className="tc-handoff__act">
+        <button type="button" className="tc-handoff__go" disabled={!ready || disabled} onClick={submit}>
+          Build my itinerary
+        </button>
+        <span className="tc-handoff__hint">Starts when you tap it.</span>
+      </div>
     </div>
   );
 }

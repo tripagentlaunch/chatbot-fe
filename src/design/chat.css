@@ -1054,3 +1054,15 @@ html:has(.tc-root) body {
   .tc-back { padding: 5px 8px; }
   .tc-back__short { display: none; }        /* the arrow alone on phones, so the account stays in view */
 }
+
+/* The trip as it arrived from the website, at the top of the answers card (2026-11-19). */
+.tc-handoff__trip { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid rgba(242, 237, 228, 0.1); }
+.tc-handoff__eyebrow { margin: 0; color: var(--tc-champagne); font-size: 11px; line-height: 16px; letter-spacing: 0.14em; text-transform: uppercase; }
+.tc-handoff__legs { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.tc-handoff__legs li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; }
+.tc-handoff__leg { font-family: "Fraunces", Georgia, serif; font-size: 17px; line-height: 22px; color: var(--tc-ivory); }
+.tc-handoff__days { color: var(--tc-ivory-3); font-size: 13px; line-height: 22px; font-variant-numeric: tabular-nums; }
+.tc-handoff__picks { grid-column: 1 / -1; color: var(--tc-ivory-3); font-size: 12.5px; line-height: 18px; }
+.tc-handoff__note { margin: 0; color: var(--tc-ivory-2); font-size: 14px; line-height: 20px; }
+.tc-handoff__act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tc-handoff__hint { color: var(--tc-ivory-3); font-size: 12px; }
