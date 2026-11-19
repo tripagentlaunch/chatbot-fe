@@ -1,6 +1,12 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 export const TOKEN_KEY = "tripagent.token";
 
+// The member's time zone ("Asia/Kolkata"), so Tara's "Good afternoon" matches their clock, not the
+// server's (2026-11-19, direct request).
+const memberTimezone = (() => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; }
+})();
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -40,6 +46,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
+  if (memberTimezone) headers.set("X-Timezone", memberTimezone);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const res = await fetchWithRetry(`${BASE_URL}${path}`, { ...options, headers });
   if (!res.ok) {
@@ -74,6 +81,7 @@ export async function streamChat(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(memberTimezone ? { "X-Timezone": memberTimezone } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(attachments.length ? { message, chatId, attachments } : { message, chatId }),
