@@ -1086,3 +1086,17 @@ html:has(.tc-root) body {
 .tc-handoff__select:focus-visible, .tc-handoff__seg button:focus-visible { outline: 2px solid var(--tc-champagne); outline-offset: 2px; }
 .tc-handoff .tc-handoff__text { justify-self: start; width: min(100%, 240px); }
 @media (max-width: 420px) { .tc-handoff__row { grid-template-columns: 70px minmax(0, 1fr); } }
+
+/* The trip as it arrived, a quiet record under Tara's message (2026-11-19: no pickers or pills). */
+.tc-dossier { display: grid; gap: 14px; max-width: 560px; padding: 18px 20px; border-radius: 18px;
+  border: 1px solid rgba(242, 237, 228, 0.12); background: rgba(14, 13, 12, 0.42); }
+.tc-dossier__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(216, 194, 154, 0.22); }
+.tc-dossier__eyebrow { color: var(--tc-champagne); font-size: 11px; line-height: 16px; letter-spacing: 0.18em; text-transform: uppercase; }
+.tc-dossier__total { color: var(--tc-ivory-3); font-size: 12px; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.tc-dossier__legs { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.tc-dossier__line { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.tc-dossier__city { font-family: "Fraunces", Georgia, serif; font-weight: 400; font-size: 20px; line-height: 26px; letter-spacing: -0.005em; color: var(--tc-ivory); }
+.tc-dossier__days { color: var(--tc-ivory-3); font-size: 12px; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tc-dossier__picks { margin: 4px 0 0; color: var(--tc-ivory-2); font-size: 13px; line-height: 20px; }
+.tc-dossier__foot { margin: 0; padding-top: 12px; border-top: 1px solid rgba(242, 237, 228, 0.08); color: var(--tc-ivory-3); font-size: 12px; letter-spacing: 0.04em; }
