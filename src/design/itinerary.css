@@ -422,6 +422,16 @@
 .pv-recflight-time {
   font-family: "Proposal Serif", serif;
   font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.pv-recflight-plus {
+  margin-left: 3px;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: var(--muted);
+  vertical-align: super;
 }
 .pv-recflight-city {
   font-size: 11px;

@@ -196,8 +196,28 @@ function OptionName({ c, block }: { c: Choice; block?: boolean }) {
   );
 }
 
+// Flight times arrive as timestamps ("2026-11-28T11:55") as well as plain "11:55" (2026-11-19, direct
+// request: the raw timestamp read huge and untidy). The card shows the time alone, the airport and a short
+// date beneath, and "+1" when the flight lands on a later day.
+type FlightTime = { time: string; date: string | null; day: string | null };
+function flightTime(raw?: string | null): FlightTime | null {
+  if (!raw) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})/.exec(raw.trim());
+  if (!m) return { time: raw, date: null, day: null };
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  const date = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  return { time: `${m[4].padStart(2, "0")}:${m[5]}`, date, day: `${m[1]}-${m[2]}-${m[3]}` };
+}
+function laterDays(dep: FlightTime | null, arr: FlightTime | null): number {
+  if (!dep?.day || !arr?.day) return 0;
+  return Math.round((Date.parse(arr.day) - Date.parse(dep.day)) / 86400000);
+}
+
 function FlightRow({ c, badge }: { c: Choice; badge: string }) {
   const f = c.flight;
+  const dep = flightTime(f?.depTime);
+  const arr = flightTime(f?.arrTime);
+  const plus = laterDays(dep, arr);
   return (
     <div className="pv-recflight">
       <div className="pv-recflight-head">
@@ -207,8 +227,8 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
       {f ? (
         <div className="pv-recflight-row">
           <div>
-            <div className="pv-recflight-time">{f.depTime || "TBC"}</div>
-            <div className="pv-recflight-city">{f.depCity}</div>
+            <div className="pv-recflight-time">{dep?.time || "TBC"}</div>
+            <div className="pv-recflight-city">{[f.depCity, dep?.date].filter(Boolean).join(" · ")}</div>
           </div>
           <div className="pv-recflight-mid">
             {f.flightNos ? <div className="pv-recflight-nos">{f.flightNos}</div> : null}
@@ -216,8 +236,11 @@ function FlightRow({ c, badge }: { c: Choice; badge: string }) {
             <div className="pv-recflight-sub">{[f.duration, f.cabin].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div className="pv-recflight-time">{f.arrTime || "TBC"}</div>
-            <div className="pv-recflight-city">{f.arrCity}</div>
+            <div className="pv-recflight-time">
+              {arr?.time || "TBC"}
+              {plus > 0 ? <sup className="pv-recflight-plus">+{plus}</sup> : null}
+            </div>
+            <div className="pv-recflight-city">{[f.arrCity, arr?.date].filter(Boolean).join(" · ")}</div>
           </div>
         </div>
       ) : null}
@@ -252,6 +275,13 @@ function StayCard({ c, badge }: { c: Choice; badge: string }) {
   );
 }
 
+function altTimes(depRaw?: string | null, arrRaw?: string | null): string {
+  const dep = flightTime(depRaw);
+  const arr = flightTime(arrRaw);
+  const plus = laterDays(dep, arr);
+  return `${dep?.date ? `${dep.date}, ` : ""}${dep?.time || "TBC"} – ${arr?.time || "TBC"}${plus > 0 ? ` (+${plus})` : ""}`;
+}
+
 function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: () => void }) {
   const img = hotel ? photoOf(c) : undefined;
   return (
@@ -261,7 +291,7 @@ function AltOption({ c, hotel, onSwap }: { c: Choice; hotel: boolean; onSwap: ()
         <OptionName c={c} block />
         {c.flight ? (
           <div className="pv-option-timing">
-            {c.flight.depTime || "TBC"} – {c.flight.arrTime || "TBC"}
+            {altTimes(c.flight.depTime, c.flight.arrTime)}
           </div>
         ) : null}
         <div className="pv-option-detail">{c.details}</div>
