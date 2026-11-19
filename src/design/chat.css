@@ -1024,3 +1024,33 @@ html:has(.tc-root) body {
 
 /* Back after a gap: a brief greeting by name (2026-11-18). */
 .tc-welcome { color: var(--tc-ivory-2); font-size: 13px; }
+
+/* Back to the website (2026-11-19): a pill beside the wordmark, in the tabs' glass. */
+.tc-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 14px 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 237, 228, 0.14);
+  background: rgba(32, 32, 35, 0.6);
+  color: var(--tc-ivory-2);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.tc-back:hover { color: var(--tc-ivory); border-color: rgba(216, 194, 154, 0.5); }
+.tc-back:focus-visible { outline: 2px solid var(--tc-champagne); outline-offset: 2px; }
+.tc-back__short { display: none; }
+@media (max-width: 600px) {
+  .tc-back__long { display: none; }
+  .tc-back__short { display: inline; }
+}
+@media (max-width: 480px) {
+  .tc-back { padding: 5px 8px; }
+  .tc-back__short { display: none; }        /* the arrow alone on phones, so the account stays in view */
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./lib/returnTo"; // reads #from= before the sign-in clears the fragment
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, AuthProvider, useAuth } from "./context/AuthContext";
 import AuthScreen from "./design/AuthScreen";

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { returnTo } from "../lib/returnTo";
 
 // The app's navigation, drawn inside the Tara header (same glass, same type) so
 // the chat and trips screens read as one surface rather than a page with a box
@@ -28,9 +29,19 @@ export default function TopNav() {
   const name = member && member.name !== "Traveller" ? member.name : null;
   const initial = (name || member?.code || "T").trim().charAt(0).toUpperCase();
 
+  const back = returnTo();
+
   return (
     <div className="tc-nav">
       <span className="tc-wordmark">TripAgent</span>
+      {/* Back to the page on the website they came from (lib/returnTo.ts). */}
+      <a className="tc-back" href={back.href} title={`Back to ${back.label} on tripagent.vip`}>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="tc-back__long">Back to {back.label}</span>
+        <span className="tc-back__short">Website</span>
+      </a>
       <nav className="tc-tabs" aria-label="Main">
         <NavLink to="/chat" className="tc-tab">
           Chat
