@@ -11,6 +11,7 @@ export type HandoffView = {
   };
   budget: string | null;
   origin?: string | null;
+  dates?: { start: string; end: string } | null;
   missing: ("travellers" | "origin" | "when" | "budget")[];
   questions: Record<string, string>;
   tooLong?: boolean;
@@ -92,6 +93,16 @@ function ReplyCard({ view, onSend, sendLabel }: { view: HandoffView; onSend: (te
   );
 }
 
+// "12–19 Jan 2027" for the trip's dates from the website's calendar.
+function fmtRange(a: string, b: string): string {
+  const d = (s: string) => { const [y, m, dd] = s.split("-").map(Number); return new Date(y, m - 1, dd); };
+  const x = d(a), y = d(b);
+  const mon = (t: Date) => t.toLocaleString("en-GB", { month: "short" });
+  return x.getMonth() === y.getMonth() && x.getFullYear() === y.getFullYear()
+    ? `${x.getDate()}–${y.getDate()} ${mon(y)} ${y.getFullYear()}`
+    : `${x.getDate()} ${mon(x)} – ${y.getDate()} ${mon(y)} ${y.getFullYear()}`;
+}
+
 export default function TripHandoffCard({ view, onSend, sendLabel = "Send" }: { view: HandoffView; onSend?: (text: string) => void; sendLabel?: string }) {
   const { trip } = view;
   return (
@@ -101,6 +112,7 @@ export default function TripHandoffCard({ view, onSend, sendLabel = "Send" }: { 
         <span className="tc-dossier__total">
           {trip.totalDays} {trip.totalDays === 1 ? "day" : "days"}
           {trip.legs.length > 1 ? ` · ${trip.legs.length} cities` : ""}
+          {view.dates ? ` · ${fmtRange(view.dates.start, view.dates.end)}` : ""}
         </span>
       </header>
       <ol className="tc-dossier__legs">
